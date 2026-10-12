@@ -28,6 +28,14 @@ jobs:
       - name: Check Worker syntax
         working-directory: worker
         run: npx wrangler deploy --dry-run --outdir=/tmp/tekaym-worker-dry-run
+      - name: Check client JavaScript syntax
+        run: |
+          cp src/main.js /tmp/tekaym-main.mjs
+          cp src/config.js /tmp/tekaym-config.mjs
+          cp src/prison.js /tmp/tekaym-prison.mjs
+          node --check /tmp/tekaym-main.mjs
+          node --check /tmp/tekaym-config.mjs
+          node --check /tmp/tekaym-prison.mjs
       - name: Check client structure
         run: |
           test -f index.html
