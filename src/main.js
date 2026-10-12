@@ -25,7 +25,7 @@ const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
 const keys={w:false,a:false,s:false,d:false};
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false};
-let knife=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,googleReady=false;
+let knife=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,googleReady=false,connected=false;
 
 function setBoot(text){if(bootStatus)bootStatus.textContent=text}
 function updateHud(){
@@ -64,8 +64,8 @@ function attack(){
  const origin=controls.object.position.clone(),forward=new THREE.Vector3();camera.getWorldDirection(forward);
  let best=null,bestD=2.25;
  for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
- if(socket?.readyState===WebSocket.OPEN&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
- if(best){best.userData.hp-=20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
+ if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
+ else if(!connected&&best){best.userData.hp-=20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
@@ -92,23 +92,33 @@ async function onGoogleCredential(response){
 }
 function startSocket(fromLogin=false){
  const url=SERVER_URL;
- if(url.includes('YOUR-TEKAYM-BELMO')){loginGate.classList.remove('hidden');loginStatus.textContent='El servidor todavía no está conectado a este proyecto.';boot.classList.add('hidden');hint.textContent='Configura SERVER_URL en src/config.js para activar el multiplayer.';return}
+ if(url.includes('YOUR-SUBDOMAIN')||url.includes('YOUR-TEKAYM')){loginGate.classList.remove('hidden');loginStatus.textContent='El servidor de Cloudflare todavía no está conectado. El prototipo local está disponible.';boot.classList.add('hidden');hint.textContent='Configura la URL del Worker en src/config.js para activar el multijugador.';spawnProceduralZombies(18);return}
  try{
   socket=new WebSocket(url);
   socket.addEventListener('open',()=>{socket.send(JSON.stringify({type:'join',version:GAME_VERSION,googleIdToken}))});
-  socket.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.type==='connected'){player.id=m.id}else if(m.type==='joined'){player.name=m.player.name||player.name;loginGate.classList.add('hidden');boot.classList.add('hidden')}else if(m.type==='auth_error'){showLogin(m.message||'Cuenta no válida.')}else if(m.type==='player_damage'){player.hp=Math.max(0,Number(m.hp)||0);flash()}else if(m.type==='state'){applyState(m)}else if(m.type==='chat'){console.log('[CHAT]',m.from,m.text)}});
+  socket.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.type==='connected'){player.id=m.id;if(Number.isFinite(Number(m.x))&&Number.isFinite(Number(m.z))){controls.object.position.set(Number(m.x),1.65,Number(m.z));zoneText.textContent='CELDA '+String(m.cellId||'');}}else if(m.type==='joined'){player.name=m.player.name||player.name;player.hp=Number(m.player.hp??player.hp);player.hunger=Number(m.player.hunger??player.hunger);player.thirst=Number(m.player.thirst??player.thirst);if(Number.isFinite(Number(m.player.x))&&Number.isFinite(Number(m.player.z)))controls.object.position.set(Number(m.player.x),1.65,Number(m.player.z));zoneText.textContent='CELDA '+String(m.player.cellId||'PRISIÓN');connected=true;loginGate.classList.add('hidden');boot.classList.add('hidden');applyState({players:[m.player]});}else if(m.type==='auth_error'){showLogin(m.message||'Cuenta no válida.')}else if(m.type==='auth_required'){showLogin('Inicia sesión con Google para entrar.')}else if(m.type==='attack_ack'){const hit=zombies.find(z=>z.userData.id===m.targetId);if(hit&&Number.isFinite(Number(m.zombieHp))){hit.userData.hp=Number(m.zombieHp);hit.visible=hit.userData.hp>0;}}else if(m.type==='state'){applyState(m)}else if(m.type==='chat'){console.log('[CHAT]',m.from,m.text)}});
   socket.addEventListener('close',()=>{if(!player.dead&&fromLogin)showLogin('Conexión cerrada. Reintentando…')});
  }catch(e){console.error('[TEKAYM WS]',e);showLogin('No se pudo conectar con el servidor.')}
 }
 function applyState(m){
  for(const p of m.players||[]){
-  if(p.id===player.id){player.hp=Number(p.hp)||player.hp;continue}
+  if(p.id===player.id){player.hp=Number(p.hp??player.hp);player.hunger=Number(p.hunger??player.hunger);player.thirst=Number(p.thirst??player.thirst);if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}continue}
   let obj=remotePlayers.get(p.id);
   if(!obj){obj=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,5,8),new THREE.MeshStandardMaterial({color:0x6bb7ff,roughness:.9}));scene.add(obj);remotePlayers.set(p.id,obj)}
   obj.position.set(Number(p.x)||0,1.0,Number(p.z)||0);
  }
+ for(const data of m.zombies||[]){
+  const zombie=zombies.find(z=>z.userData.id===data.id);if(!zombie)continue;
+  zombie.userData.hp=Number(data.hp??zombie.userData.hp);zombie.userData.targetX=Number(data.x);zombie.userData.targetZ=Number(data.z);
+  zombie.visible=zombie.userData.hp>0;
+ }
 }
-function sendMove(now){if(socket?.readyState===WebSocket.OPEN&&now-lastNet>100){lastNet=now;socket.send(JSON.stringify({type:'move',x:controls.object.position.x,z:controls.object.position.z}))}}
+function sendMove(now){
+ if(socket?.readyState!==WebSocket.OPEN||!connected||now-lastNet<250)return;
+ const x=controls.object.position.x,z=controls.object.position.z;
+ if(Math.hypot(x-lastSentX,z-lastSentZ)<.12)return;
+ lastNet=now;lastSentX=x;lastSentZ=z;socket.send(JSON.stringify({type:'move',x,z}));
+}
 function installTouch(){
  const move=$('moveStick'),mk=$('moveKnob'),look=$('lookStick'),lk=$('lookKnob');let mi=null,li=null;
  const point=(stick,knob,e)=>{const r=stick.getBoundingClientRect(),cx=r.width/2,cy=r.height/2;let x=e.clientX-r.left-cx,y=e.clientY-r.top-cy;const n=Math.hypot(x,y);if(n>38){x=x/n*38;y=y/n*38}knob.style.transform='translate('+x+'px,'+y+'px)';return{x:x/38,y:y/38}};
@@ -124,5 +134,5 @@ installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 async function bootGame(){setBoot('Cargando Tekaym Online V1…');await loadAssets();await initGoogle();boot.classList.add('hidden');showLogin('Inicia sesión con Google para comenzar.')};
 bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('Error recuperable del prototipo.');setTimeout(()=>boot.classList.add('hidden'),700);initGoogle()});
-function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.rotation.y=Math.atan2(to.x,to.z)} }sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
+function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.rotation.y=Math.atan2(to.x,to.z)}}}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();requestAnimationFrame(animate);
