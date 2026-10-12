@@ -132,7 +132,20 @@ function installTouch(){
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
-async function bootGame(){setBoot('Cargando Tekaym Online V1…');await loadAssets();await initGoogle();boot.classList.add('hidden');showLogin('Inicia sesión con Google para comenzar.')};
-bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('Error recuperable del prototipo.');setTimeout(()=>boot.classList.add('hidden'),700);initGoogle()});
+async function bootGame(){
+ setBoot('Cargando Tekaym Online V1…');
+ await loadAssets();
+ const serverNotConfigured=SERVER_URL.includes('YOUR-SUBDOMAIN')||SERVER_URL.includes('YOUR-TEKAYM');
+ if(serverNotConfigured){
+  connected=false;boot.classList.add('hidden');loginGate.classList.add('hidden');
+  hint.textContent='PROTOTIPO LOCAL · WASD para moverte · mouse para mirar · Espacio/ATACAR para usar el cuchillo. El multijugador se activa al conectar Cloudflare.';
+  zoneText.textContent='PRISIÓN · MODO LOCAL';
+  return;
+ }
+ await initGoogle();
+ boot.classList.add('hidden');
+ if(!googleReady)showLogin('Configura Google y el servidor para iniciar sesión.');
+}
+bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('Error recuperable del prototipo.');setTimeout(()=>boot.classList.add('hidden'),700);const serverNotConfigured=SERVER_URL.includes('YOUR-SUBDOMAIN')||SERVER_URL.includes('YOUR-TEKAYM');if(serverNotConfigured)loginGate.classList.add('hidden');else initGoogle()});
 function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.rotation.y=Math.atan2(to.x,to.z)}}}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();requestAnimationFrame(animate);
