@@ -1,118 +1,433 @@
 import { DurableObject } from 'cloudflare:workers';
-const MAX_PLAYERS=16;
-const WORLD={minX:-108,maxX:108,minZ:-88,maxZ:88};
-function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','access-control-allow-origin':'*'}})}
-function uid(){return crypto.randomUUID().replaceAll('-','').slice(0,16)}
-function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
-function safeText(v,max=160){return String(v??'').trim().slice(0,max)}
-function b64urlBytes(input){const s=typeof input==='string'?input:JSON.stringify(input);const bytes=new TextEncoder().encode(s);let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(out).replaceAll('+','-').replaceAll('/','_').replaceAll('=','')}
-function pemToArrayBuffer(pem){const b64=String(pem).replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s+/g,'');const bin=atob(b64);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out.buffer}
-let firebaseTokenCache={value:'',exp:0};
-async function firebaseAccessToken(env){
-  const raw=String(env.FIREBASE_SERVICE_ACCOUNT_JSON||'').trim();if(!raw)throw new Error('Firebase service account no configurada');
-  const sa=JSON.parse(raw.replace(/^var\s+admin\s*=\s*/,'').replace(/;?\s*$/,''));
-  const now=Math.floor(Date.now()/1000);
-  if(firebaseTokenCache.value&&firebaseTokenCache.exp>now+60)return firebaseTokenCache.value;
-  const key=await crypto.subtle.importKey('pkcs8',pemToArrayBuffer(sa.private_key),{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
-  const header=b64urlBytes({alg:'RS256',typ:'JWT'});
-  const payload=b64urlBytes({iss:sa.client_email,scope:'https://www.googleapis.com/auth/datastore',aud:'https://oauth2.googleapis.com/token',iat:now,exp:now+3600});
-  const data=header+'.'+payload;
-  const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(data));
-  const jwt=data+'.'+b64urlBytes(new Uint8Array(sig));
-  const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:jwt})});
-  if(!r.ok)throw new Error('No se pudo obtener acceso de Firestore');
-  const j=await r.json();firebaseTokenCache={value:String(j.access_token||''),exp:now+Number(j.expires_in||3600)};return firebaseTokenCache.value;
+
+const MAX_PLAYERS = 16;
+const MAX_ZOMBIES = 18;
+const WORLD = { minX: -108, maxX: 108, minZ: -88, maxZ: 88 };
+const MOVE_SPEED_LIMIT = 4.8;
+const ATTACK_COOLDOWN_MS = 520;
+const PLAYER_SAVE_MS = 120000;
+const ALARM_MS = 10000;
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*' }
+  });
 }
-function docId(sub){let h=0;for(const ch of String(sub)){h=((h<<5)-h+ch.charCodeAt(0))|0}return Math.abs(h).toString(36)+'-'+btoa(String(sub)).replaceAll('/','_').replaceAll('+','-').slice(0,24)}
-function toFields(obj){const f={};for(const [k,v] of Object.entries(obj||{})){if(v===undefined||v===null)continue;if(typeof v==='number'&&Number.isFinite(v))f[k]={doubleValue:v};else if(typeof v==='boolean')f[k]={booleanValue:v};else f[k]={stringValue:String(v)}}return f}
-function fromFields(fields){const out={};for(const [k,v] of Object.entries(fields||{})){if('doubleValue'in v)out[k]=Number(v.doubleValue);else if('integerValue'in v)out[k]=Number(v.integerValue);else if('booleanValue'in v)out[k]=Boolean(v.booleanValue);else if('stringValue'in v)out[k]=v.stringValue}return out}
-async function fsRequest(env,path,init={}){
-  const token=await firebaseAccessToken(env);const project=String(env.FIREBASE_PROJECT_ID||'').trim();if(!project)throw new Error('FIREBASE_PROJECT_ID no configurado');
-  const r=await fetch('https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(project)+'/databases/(default)/documents/'+path,{...init,headers:{...(init.headers||{}),authorization:'Bearer '+token,'content-type':'application/json'}});
-  return r;
+function uid() { return crypto.randomUUID().replaceAll('-', '').slice(0, 16); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function safeText(v, max = 160) { return String(v ?? '').trim().slice(0, max); }
+function b64url(input) {
+  const bytes = new TextEncoder().encode(String(input));
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(out).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
-async function loadPlayer(env,sub){
-  const r=await fsRequest(env,'tekaym_players/'+encodeURIComponent(docId(sub)));if(r.status===404)return null;if(!r.ok)throw new Error('Firestore load '+r.status);const d=await r.json();return fromFields(d.fields);
+function pemToArrayBuffer(pem) {
+  const b64 = String(pem).replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s+/g, '');
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
 }
-async function savePlayer(env,sub,data){
-  const r=await fsRequest(env,'tekaym_players/'+encodeURIComponent(docId(sub)),{method:'PATCH',body:JSON.stringify({fields:toFields({...data,googleSub:sub,updatedAt:Date.now()})})});if(!r.ok)throw new Error('Firestore save '+r.status);return true;
+let firebaseTokenCache = { value: '', exp: 0, email: '' };
+async function firebaseAccessToken(env) {
+  const raw = String(env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON no configurado');
+  const sa = JSON.parse(raw.replace(/^var\s+admin\s*=\s*/, '').replace(/;?\s*$/, ''));
+  const now = Math.floor(Date.now() / 1000);
+  if (firebaseTokenCache.value && firebaseTokenCache.exp > now + 60 && firebaseTokenCache.email === sa.client_email) return firebaseTokenCache.value;
+  const key = await crypto.subtle.importKey('pkcs8', pemToArrayBuffer(sa.private_key), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = b64url(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const signed = header + '.' + payload;
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signed));
+  const jwt = signed + '.' + b64url(String.fromCharCode(...new Uint8Array(signature)));
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt })
+  });
+  if (!response.ok) throw new Error('No se pudo obtener el token de acceso de Firestore');
+  const result = await response.json();
+  firebaseTokenCache = { value: String(result.access_token || ''), exp: now + Number(result.expires_in || 3600), email: sa.client_email };
+  return firebaseTokenCache.value;
 }
-async function ensureAccount(env,g){
-  const body={fields:toFields({googleSub:g.sub,email:g.email,name:g.name,updatedAt:Date.now()})};
-  const r=await fsRequest(env,'tekaym_accounts/'+encodeURIComponent(docId(g.sub)),{method:'PATCH',body:JSON.stringify(body)});if(!r.ok)throw new Error('Firestore account '+r.status);return true;
+function docId(sub) { return b64url(sub); }
+function toFields(obj) {
+  const fields = {};
+  for (const [key, value] of Object.entries(obj || {})) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === 'number' && Number.isFinite(value)) fields[key] = { doubleValue: value };
+    else if (typeof value === 'boolean') fields[key] = { booleanValue: value };
+    else fields[key] = { stringValue: String(value) };
+  }
+  return fields;
 }
-async function verifyGoogle(idToken,env){
-  const clientId=String(env.GOOGLE_CLIENT_ID||'').trim();if(!clientId)throw new Error('GOOGLE_CLIENT_ID no configurado');if(!idToken)throw new Error('Inicia sesión con Google');
-  const r=await fetch('https://oauth2.googleapis.com/tokeninfo?id_token='+encodeURIComponent(idToken),{cache:'no-store'});if(!r.ok)throw new Error('Token de Google inválido');
-  const p=await r.json();if(String(p.aud||'')!==clientId)throw new Error('Token de Google no pertenece a Tekaym');if(Number(p.exp||0)<=Math.floor(Date.now()/1000))throw new Error('Sesión de Google expirada');if(String(p.email_verified||'').toLowerCase()!=='true')throw new Error('Correo de Google no verificado');if(!p.sub)throw new Error('Identidad Google inválida');
-  return {sub:String(p.sub),email:String(p.email||''),name:safeText(p.name||p.email||'Jugador',20)};
+function fromFields(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields || {})) {
+    if ('doubleValue' in value) out[key] = Number(value.doubleValue);
+    else if ('integerValue' in value) out[key] = Number(value.integerValue);
+    else if ('booleanValue' in value) out[key] = Boolean(value.booleanValue);
+    else if ('stringValue' in value) out[key] = value.stringValue;
+  }
+  return out;
+}
+async function firestoreRequest(env, path, init = {}) {
+  const project = String(env.FIREBASE_PROJECT_ID || '').trim();
+  if (!project) throw new Error('FIREBASE_PROJECT_ID no configurado');
+  const token = await firebaseAccessToken(env);
+  return fetch('https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(project) + '/databases/(default)/documents/' + path, {
+    ...init,
+    headers: { ...(init.headers || {}), authorization: 'Bearer ' + token, 'content-type': 'application/json' }
+  });
+}
+async function loadPlayer(env, sub) {
+  const response = await firestoreRequest(env, 'tekaym_players/' + encodeURIComponent(docId(sub)));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('Firestore no pudo cargar el progreso');
+  return fromFields((await response.json()).fields);
+}
+async function savePlayer(env, sub, data) {
+  const response = await firestoreRequest(env, 'tekaym_players/' + encodeURIComponent(docId(sub)), {
+    method: 'PATCH',
+    body: JSON.stringify({ fields: toFields({ ...data, googleSub: sub, updatedAt: Date.now() }) })
+  });
+  if (!response.ok) throw new Error('Firestore no pudo guardar el progreso');
+}
+async function ensureAccount(env, google) {
+  const path = 'tekaym_accounts/' + encodeURIComponent(docId(google.sub));
+  const mask = 'updateMask.fieldPaths=googleSub&updateMask.fieldPaths=email&updateMask.fieldPaths=name&updateMask.fieldPaths=updatedAt';
+  const response = await firestoreRequest(env, path + '?' + mask, {
+    method: 'PATCH',
+    body: JSON.stringify({ fields: toFields({ googleSub: google.sub, email: google.email, name: google.name, updatedAt: Date.now() }) })
+  });
+  if (response.status === 404) {
+    const create = await firestoreRequest(env, path, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ googleSub: google.sub, email: google.email, name: google.name, createdAt: Date.now(), updatedAt: Date.now() }) })
+    });
+    if (!create.ok) throw new Error('Firestore no pudo crear la cuenta');
+    return;
+  }
+  if (!response.ok) throw new Error('Firestore no pudo actualizar la cuenta');
+}
+async function verifyGoogle(idToken, env) {
+  const clientId = String(env.GOOGLE_CLIENT_ID || '').trim();
+  if (!clientId) throw new Error('GOOGLE_CLIENT_ID no configurado en Cloudflare');
+  if (!idToken) throw new Error('Inicia sesión con Google');
+  const response = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { cache: 'no-store' });
+  if (!response.ok) throw new Error('Token de Google inválido');
+  const payload = await response.json();
+  if (String(payload.aud || '') !== clientId) throw new Error('La cuenta de Google no pertenece a Tekaym');
+  if (!['accounts.google.com', 'https://accounts.google.com'].includes(String(payload.iss || ''))) throw new Error('Emisor de Google inválido');
+  if (Number(payload.exp || 0) <= Math.floor(Date.now() / 1000)) throw new Error('Sesión de Google expirada');
+  if (String(payload.email_verified || '').toLowerCase() !== 'true') throw new Error('Correo de Google no verificado');
+  if (!payload.sub) throw new Error('Identidad de Google inválida');
+  return { sub: String(payload.sub), email: String(payload.email || ''), name: safeText(payload.name || payload.email || 'Jugador', 20) };
+}
+function makeCells() {
+  const cells = [];
+  const offsets = [[-65, -48], [65, -48], [-65, 48], [65, 48]];
+  for (let area = 0; area < offsets.length; area++) {
+    const ox = offsets[area][0], oz = offsets[area][1];
+    for (let side = 0; side < 2; side++) {
+      for (let i = 0; i < 8; i++) {
+        const x = ox + (i - 3.5) * 4;
+        const z = oz + (side === 0 ? -11 : 11);
+        cells.push({
+          id: String.fromCharCode(65 + area) + '-' + String(i + 1).padStart(2, '0') + (side ? 'B' : 'A'),
+          x,
+          z: z + (side === 0 ? -1.2 : 1.2),
+          centerX: x,
+          centerZ: z
+        });
+      }
+    }
+  }
+  return cells;
+}
+const CELLS = makeCells();
+function isInsideCell(x, z, margin = 0) {
+  return CELLS.some(cell => Math.abs(x - cell.centerX) < 2 - margin && Math.abs(z - cell.centerZ) < 2.5 - margin);
+}
+function randomCellSpawn() { return CELLS[Math.floor(Math.random() * CELLS.length)]; }
+function randomZombieSpot() {
+  for (let attempt = 0; attempt < 250; attempt++) {
+    const x = (Math.random() * 2 - 1) * 96;
+    const z = (Math.random() * 2 - 1) * 78;
+    if (!isInsideCell(x, z, -0.1)) return { x, z };
+  }
+  return { x: 0, z: 0 };
+}
+function createZombies() {
+  return Array.from({ length: MAX_ZOMBIES }, (_, i) => {
+    const pos = randomZombieSpot();
+    return { id: 'z' + i, x: pos.x, z: pos.z, hp: 45, maxHp: 45, speed: 1.05 + Math.random() * 0.45, lastHit: 0, respawnAt: 0 };
+  });
 }
 
 export class GameRoom extends DurableObject {
-  constructor(ctx,env){
-    super(ctx,env);this.ctx=ctx;this.env=env;this.sessions=new Map();this.initialized=false;
-    for(const ws of this.ctx.getWebSockets()){const a=ws.deserializeAttachment();if(a?.id)this.sessions.set(a.id,{ws,...a})}
-    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping','pong'));
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.ctx = ctx;
+    this.env = env;
+    this.sessions = new Map();
+    this.zombies = [];
+    this.initialized = false;
+    this.lastWorldTick = Date.now();
+    for (const ws of this.ctx.getWebSockets()) {
+      const attachment = ws.deserializeAttachment();
+      if (attachment && attachment.id) this.sessions.set(attachment.id, { ...attachment, ws });
+    }
   }
-  async load(){
-    if(this.initialized)return;
-    this.initialized=true;
-    if(!(await this.ctx.storage.get('bootedAt')))await this.ctx.storage.put('bootedAt',Date.now());
+
+  async load() {
+    if (this.initialized) return;
+    this.initialized = true;
+    this.zombies = await this.ctx.storage.get('zombies');
+    if (!Array.isArray(this.zombies) || !this.zombies.length) {
+      this.zombies = createZombies();
+      await this.ctx.storage.put('zombies', this.zombies);
+    }
+    const nextAlarm = await this.ctx.storage.getAlarm();
+    if (nextAlarm === null) await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
   }
-  async fetch(request){
+
+  async fetch(request) {
     await this.load();
-    if(request.headers.get('Upgrade')!=='websocket')return json({ok:true,game:'Tekaym Online',version:this.env.GAME_VERSION||'V1',players:this.sessions.size,maxPlayers:MAX_PLAYERS});
-    if(this.sessions.size>=MAX_PLAYERS)return new Response('Server full',{status:503});
-    const pair=new WebSocketPair();const [client,server]=Object.values(pair);const id=uid();
-    const session={id,name:'Jugador',googleSub:'',x:0,z:0,hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,lastMove:0,lastSave:0,lastNeeds:Date.now()};
-    this.ctx.acceptWebSocket(server,['room:main','session:'+id]);server.serializeAttachment(session);session.ws=server;this.sessions.set(id,session);
-    server.send(JSON.stringify({type:'connected',id,release:this.env.GAME_VERSION||'V1',maxPlayers:MAX_PLAYERS,googleConfigured:Boolean(this.env.GOOGLE_CLIENT_ID)}));
-    return new Response(null,{status:101,webSocket:client});
+    if (request.headers.get('Upgrade') !== 'websocket') {
+      return json({ ok: true, game: 'Tekaym Online', version: this.env.GAME_VERSION || 'V1', players: this.sessions.size, maxPlayers: MAX_PLAYERS });
+    }
+    if (this.sessions.size >= MAX_PLAYERS) return json({ ok: false, error: 'Servidor lleno', maxPlayers: MAX_PLAYERS }, 503);
+    const pair = new WebSocketPair();
+    const client = pair[0], server = pair[1];
+    const cell = randomCellSpawn();
+    const session = {
+      id: uid(), name: 'Jugador', googleSub: '', email: '',
+      x: cell.x, z: cell.z, cellId: cell.id,
+      hp: 100, maxHp: 100, stamina: 100, hunger: 100, thirst: 100,
+      joined: false, lastMove: 0, lastAttack: 0, lastSave: Date.now(), lastNeeds: Date.now()
+    };
+    this.ctx.acceptWebSocket(server, ['room:main', 'session:' + session.id]);
+    server.serializeAttachment(session);
+    session.ws = server;
+    this.sessions.set(session.id, session);
+    server.send(JSON.stringify({ type: 'connected', id: session.id, release: this.env.GAME_VERSION || 'V1', maxPlayers: MAX_PLAYERS, cellId: cell.id, x: cell.x, z: cell.z, googleConfigured: Boolean(this.env.GOOGLE_CLIENT_ID) }));
+    this.persistSession(server, session);
+    return new Response(null, { status: 101, webSocket: client });
   }
-  refreshSession(ws){
-    const a=ws.deserializeAttachment();if(!a?.id)return null;
-    let s=this.sessions.get(a.id);if(!s){s={...a,ws};this.sessions.set(a.id,s)}else s.ws=ws;
-    return s;
+
+  refreshSession(ws) {
+    const attachment = ws.deserializeAttachment();
+    if (!attachment || !attachment.id) return null;
+    let session = this.sessions.get(attachment.id);
+    if (!session) {
+      session = { ...attachment, ws };
+      this.sessions.set(session.id, session);
+    } else session.ws = ws;
+    return session;
   }
-  persistSession(ws,s){const clean={...s};delete clean.ws;ws.serializeAttachment(clean)}
-  broadcast(payload){const raw=JSON.stringify(payload);for(const ws of this.ctx.getWebSockets())try{if(ws.readyState===1)ws.send(raw)}catch{}}
-  webSocketClose(ws){const s=this.refreshSession(ws);if(s)saveSessionSnapshot(this.env,s).catch(()=>{});if(s)this.sessions.delete(s.id);this.broadcastState()}
-  webSocketError(ws){const s=this.refreshSession(ws);if(s)this.sessions.delete(s.id)}
-  async webSocketMessage(ws,message){
-    const p=this.refreshSession(ws);if(!p)return;
-    this.updateNeeds(p);
-    let m;try{m=JSON.parse(message)}catch{return}
-    if(m.type==='join'){
-      if(this.sessions.size>MAX_PLAYERS){ws.send(JSON.stringify({type:'auth_error',message:'Servidor lleno.'}));return}
-      try{const g=await verifyGoogle(String(m.googleIdToken||''),this.env);p.googleSub=g.sub;p.name=g.name;await ensureAccount(this.env,g);const old=await loadPlayer(this.env,g.sub);if(old){p.x=clamp(Number(old.x)||0,WORLD.minX,WORLD.maxX);p.z=clamp(Number(old.z)||0,WORLD.minZ,WORLD.maxZ);p.hp=clamp(Number(old.hp)||100,0,100);p.hunger=clamp(Number(old.hunger)||100,0,100);p.thirst=clamp(Number(old.thirst)||100,0,100)}await savePlayer(this.env,g.sub,{x:p.x,z:p.z,hp:p.hp,hunger:p.hunger,thirst:p.thirst,name:p.name});ws.send(JSON.stringify({type:'joined',player:{id:p.id,name:p.name,x:p.x,z:p.z,hp:p.hp,maxHp:p.maxHp}}));this.broadcastState()}catch(e){ws.send(JSON.stringify({type:'auth_error',message:e?.message||'Autenticación inválida.'}))}
+
+  persistSession(ws, session) {
+    const clean = { ...session };
+    delete clean.ws;
+    try { ws.serializeAttachment(clean); } catch {}
+  }
+
+  send(ws, data) {
+    try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(data)); } catch {}
+  }
+
+  broadcast(data) {
+    const raw = JSON.stringify(data);
+    for (const ws of this.ctx.getWebSockets()) {
+      try { if (ws.readyState === 1) ws.send(raw); } catch {}
+    }
+  }
+
+  updateNeeds(session, now = Date.now()) {
+    const elapsed = Math.min(60, Math.max(0, (now - Number(session.lastNeeds || now)) / 1000));
+    if (!elapsed) return;
+    session.lastNeeds = now;
+    session.hunger = clamp(session.hunger - elapsed * 0.012, 0, 100);
+    session.thirst = clamp(session.thirst - elapsed * 0.018, 0, 100);
+    if (session.hunger <= 0 || session.thirst <= 0) session.hp = clamp(session.hp - elapsed * 0.8, 0, session.maxHp);
+  }
+
+  moveZombies(dt) {
+    const step = clamp(dt, 0, 0.75);
+    for (const zombie of this.zombies) {
+      if (zombie.hp <= 0) {
+        if (zombie.respawnAt && Date.now() >= zombie.respawnAt) {
+          const pos = randomZombieSpot();
+          zombie.x = pos.x; zombie.z = pos.z; zombie.hp = zombie.maxHp; zombie.respawnAt = 0;
+        }
+        continue;
+      }
+      let target = null, best = 20;
+      for (const player of this.sessions.values()) {
+        if (!player.joined || player.hp <= 0) continue;
+        const d = Math.hypot(player.x - zombie.x, player.z - zombie.z);
+        if (d < best) { best = d; target = player; }
+      }
+      if (!target) continue;
+      const dx = target.x - zombie.x, dz = target.z - zombie.z;
+      const length = Math.max(0.001, Math.hypot(dx, dz));
+      const distance = Math.min(zombie.speed * step, length);
+      const nextX = clamp(zombie.x + dx / length * distance, WORLD.minX, WORLD.maxX);
+      const nextZ = clamp(zombie.z + dz / length * distance, WORLD.minZ, WORLD.maxZ);
+      if (!isInsideCell(nextX, nextZ, 0)) { zombie.x = nextX; zombie.z = nextZ; }
+      if (Math.hypot(target.x - zombie.x, target.z - zombie.z) <= 1.35 && Date.now() - Number(zombie.lastHit || 0) > 1200) {
+        zombie.lastHit = Date.now();
+        target.hp = clamp(target.hp - 8, 0, target.maxHp);
+      }
+    }
+  }
+
+  statePayload() {
+    return {
+      type: 'state',
+      players: [...this.sessions.values()].filter(p => p.joined).map(p => ({
+        id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp,
+        stamina: p.stamina, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId
+      })),
+      zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp }))
+    };
+  }
+
+  broadcastState() { this.broadcast(this.statePayload()); }
+
+  async webSocketMessage(ws, message) {
+    const p = this.refreshSession(ws);
+    if (!p) return;
+    const now = Date.now();
+    this.updateNeeds(p, now);
+    let msg;
+    try { msg = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); } catch { return; }
+
+    if (msg.type === 'join') {
+      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } }); return; }
+      try {
+        const google = await verifyGoogle(String(msg.googleIdToken || ''), this.env);
+        await ensureAccount(this.env, google);
+        const saved = await loadPlayer(this.env, google.sub);
+        p.googleSub = google.sub;
+        p.email = google.email;
+        p.name = google.name;
+        if (saved) {
+          p.x = clamp(Number(saved.x ?? p.x), WORLD.minX, WORLD.maxX);
+          p.z = clamp(Number(saved.z ?? p.z), WORLD.minZ, WORLD.maxZ);
+          p.cellId = String(saved.cellId || 'PRISION');
+          p.hp = clamp(Number(saved.hp ?? 100), 1, p.maxHp);
+          p.hunger = clamp(Number(saved.hunger ?? 100), 0, 100);
+          p.thirst = clamp(Number(saved.thirst ?? 100), 0, 100);
+        }
+        p.joined = true;
+        await savePlayer(this.env, google.sub, this.playerSaveData(p));
+        this.persistSession(ws, p);
+        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } });
+        this.broadcastState();
+      } catch (error) {
+        this.send(ws, { type: 'auth_error', message: error && error.message ? error.message : 'Autenticación inválida.' });
+      }
       return;
     }
-    if(m.type==='move'){
-      const x=Number(m.x),z=Number(m.z);const now=Date.now();if(now-p.lastMove<60)return;if(Number.isFinite(x)&&Number.isFinite(z)&&x>=WORLD.minX&&x<=WORLD.maxX&&z>=WORLD.minZ&&z<=WORLD.maxZ){p.x=x;p.z=z;p.lastMove=now}this.broadcastState();return;
-    }
-    if(m.type==='knife_attack'){
-      const target=String(m.targetId||'');const zombie=this.zombies.find(z=>z.id===target);if(!zombie)return;
-      const d=Math.hypot(p.x-zombie.x,p.z-zombie.z);if(d>2.7)return;
-      zombie.hp-=20;ws.send(JSON.stringify({type:'attack_ack',targetId:target,damage:20}));
-      if(zombie.hp<=0){zombie.hp=zombie.maxHp;zombie.x=clamp(p.x+(Math.random()*2-1)*25,WORLD.minX,WORLD.maxX);zombie.z=clamp(p.z+(Math.random()*2-1)*25,WORLD.minZ,WORLD.maxZ)}
+    if (!p.joined) { this.send(ws, { type: 'auth_required', message: 'Inicia sesión con Google para jugar.' }); return; }
+
+    if (msg.type === 'move') {
+      const elapsed = clamp((now - Number(p.lastMove || now)) / 1000, 0.06, 0.45);
+      const requestedX = Number(msg.x), requestedZ = Number(msg.z);
+      if (Number.isFinite(requestedX) && Number.isFinite(requestedZ) && now - p.lastMove >= 70) {
+        const dx = requestedX - p.x, dz = requestedZ - p.z;
+        const length = Math.hypot(dx, dz), maxDistance = MOVE_SPEED_LIMIT * elapsed + 0.22;
+        const ratio = length > maxDistance ? maxDistance / length : 1;
+        const nextX = clamp(p.x + dx * ratio, WORLD.minX, WORLD.maxX);
+        const nextZ = clamp(p.z + dz * ratio, WORLD.minZ, WORLD.maxZ);
+        p.x = nextX; p.z = nextZ; p.lastMove = now;
+        this.moveZombies(elapsed);
+        this.persistSession(ws, p);
+        this.broadcastState();
+      }
       return;
     }
-    if(m.type==='chat'){const text=safeText(m.text);if(text)this.broadcast({type:'chat',from:p.name,text})}
+    if (msg.type === 'knife_attack') {
+      if (now - Number(p.lastAttack || 0) < ATTACK_COOLDOWN_MS) return;
+      const targetId = safeText(msg.targetId, 40);
+      const zombie = this.zombies.find(z => z.id === targetId);
+      if (!zombie || zombie.hp <= 0) return;
+      if (Math.hypot(p.x - zombie.x, p.z - zombie.z) > 2.65) return;
+      p.lastAttack = now;
+      zombie.hp = Math.max(0, zombie.hp - 20);
+      if (zombie.hp <= 0) zombie.respawnAt = now + 6000;
+      this.persistSession(ws, p);
+      this.broadcastState();
+      this.send(ws, { type: 'attack_ack', targetId: zombie.id, damage: 20, zombieHp: zombie.hp });
+      return;
+    }
+    if (msg.type === 'chat') {
+      const text = safeText(msg.text, 160);
+      if (text) this.broadcast({ type: 'chat', from: p.name, text });
+    }
   }
-  async alarm(){this.broadcast({type:'event',event:'alarm',at:Date.now()})}
-  broadcastState(){this.broadcast({type:'state',players:[...this.sessions.values()].map(p=>({id:p.id,name:p.name,x:p.x,z:p.z,hp:p.hp,maxHp:p.maxHp}))})}
+
+  playerSaveData(p) {
+    return { name: p.name, cellId: p.cellId, x: p.x, z: p.z, hp: p.hp, hunger: p.hunger, thirst: p.thirst };
+  }
+
+  async webSocketClose(ws) {
+    const p = this.refreshSession(ws);
+    if (p && p.joined) {
+      try { await savePlayer(this.env, p.googleSub, this.playerSaveData(p)); } catch (error) { console.error('[TEKAYM SAVE ON CLOSE]', error?.message || error); }
+      this.sessions.delete(p.id);
+    } else if (p) this.sessions.delete(p.id);
+    this.broadcastState();
+  }
+
+  async webSocketError(ws) {
+    const p = this.refreshSession(ws);
+    if (p) this.sessions.delete(p.id);
+    this.broadcastState();
+  }
+
+  async alarm() {
+    await this.load();
+    const now = Date.now();
+    const elapsed = clamp((now - this.lastWorldTick) / 1000, 0, 5);
+    this.lastWorldTick = now;
+    for (const p of this.sessions.values()) {
+      this.updateNeeds(p, now);
+      if (p.joined && now - Number(p.lastSave || 0) >= PLAYER_SAVE_MS) {
+        try { await savePlayer(this.env, p.googleSub, this.playerSaveData(p)); p.lastSave = now; }
+        catch (error) { console.error('[TEKAYM AUTOSAVE]', error?.message || error); }
+      }
+      if (p.ws) this.persistSession(p.ws, p);
+    }
+    this.moveZombies(elapsed || 1);
+    await this.ctx.storage.put('zombies', this.zombies);
+    if (this.sessions.size) this.broadcastState();
+    await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
+  }
 }
 
-async function saveSessionSnapshot(env,p){if(!p.googleSub)return;await savePlayer(env,p.googleSub,{x:p.x,z:p.z,hp:p.hp,hunger:p.hunger,thirst:p.thirst,name:p.name})}
-
 export default {
-  async fetch(request,env){
-    const url=new URL(request.url);
-    if(url.pathname==='/health')return json({ok:true,game:'Tekaym Online',version:env.GAME_VERSION||'V1',status:'online',maxPlayers:MAX_PLAYERS,server:'cloudflare-durable-object'});
-    if(url.pathname==='/auth/google/config')return json({ok:Boolean(env.GOOGLE_CLIENT_ID),clientId:String(env.GOOGLE_CLIENT_ID||'')});
-    if(url.pathname==='/ws'){
-      const id=env.GAME_ROOMS.idFromName('main');return env.GAME_ROOMS.get(id).fetch(request)
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' } });
+    if (url.pathname === '/' || url.pathname === '/health') {
+      return json({ ok: true, game: 'Tekaym Online', version: env.GAME_VERSION || 'V1', status: 'online', maxPlayers: MAX_PLAYERS, server: 'cloudflare-durable-object', googleConfigured: Boolean(env.GOOGLE_CLIENT_ID), firebaseConfigured: Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_SERVICE_ACCOUNT_JSON) });
     }
-    return json({ok:false,error:'Not Found'},404);
+    if (url.pathname === '/auth/google/config') return json({ ok: Boolean(env.GOOGLE_CLIENT_ID), clientId: String(env.GOOGLE_CLIENT_ID || '') });
+    if (url.pathname === '/rooms') {
+      const id = env.GAME_ROOMS.idFromName('main');
+      return env.GAME_ROOMS.get(id).fetch(new Request(new URL('/rooms', url), request));
+    }
+    if (url.pathname === '/ws') {
+      if (request.headers.get('Upgrade') !== 'websocket') return json({ ok: false, error: 'WebSocket upgrade requerido' }, 426);
+      const id = env.GAME_ROOMS.idFromName('main');
+      return env.GAME_ROOMS.get(id).fetch(request);
+    }
+    return json({ ok: false, error: 'Not Found' }, 404);
   }
 };
