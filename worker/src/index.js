@@ -18,7 +18,9 @@ function uid() { return crypto.randomUUID().replaceAll('-', '').slice(0, 16); }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function safeText(v, max = 160) { return String(v ?? '').trim().slice(0, max); }
 function b64url(input) {
-  const bytes = new TextEncoder().encode(String(input));
+  return b64urlBytes(new TextEncoder().encode(String(input)));
+}
+function b64urlBytes(bytes) {
   let out = '';
   for (let i = 0; i < bytes.length; i += 0x8000) out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(out).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
@@ -42,7 +44,7 @@ async function firebaseAccessToken(env) {
   const payload = b64url(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/datastore', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
   const signed = header + '.' + payload;
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signed));
-  const jwt = signed + '.' + b64url(String.fromCharCode(...new Uint8Array(signature)));
+  const jwt = signed + '.' + b64urlBytes(new Uint8Array(signature));
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
