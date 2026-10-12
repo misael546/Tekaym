@@ -251,8 +251,8 @@ export class GameRoom extends DurableObject {
     const elapsed = Math.min(60, Math.max(0, (now - Number(session.lastNeeds || now)) / 1000));
     if (!elapsed) return;
     session.lastNeeds = now;
-    session.hunger = clamp(session.hunger - elapsed * 0.012, 0, 100);
-    session.thirst = clamp(session.thirst - elapsed * 0.018, 0, 100);
+    session.hunger = clamp(session.hunger - elapsed * 0.18, 0, 100);
+    session.thirst = clamp(session.thirst - elapsed * 0.26, 0, 100);
     if (session.hunger <= 0 || session.thirst <= 0) session.hp = clamp(session.hp - elapsed * 0.8, 0, session.maxHp);
   }
 
