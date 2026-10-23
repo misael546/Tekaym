@@ -352,7 +352,7 @@ export class GameRoom extends DurableObject {
         p.joined = true;
         await savePlayer(this.env, google.sub, this.playerSaveData(p));
         this.persistSession(ws, p);
-        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } });
+        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, worldClock: this.worldClock });
         this.broadcastState();
       } catch (error) {
         this.send(ws, { type: 'auth_error', message: error && error.message ? error.message : 'Autenticación inválida.' });
