@@ -13,7 +13,7 @@ scene.background=new THREE.Color(0x050608);
 scene.fog=new THREE.Fog(0x050608,42,165);
 const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,260);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);
+renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=innerWidth>800;document.body.appendChild(renderer.domElement);
 const controls=new PointerLockControls(camera,renderer.domElement);scene.add(controls.object);
 scene.add(new THREE.HemisphereLight(0x9aa8b8,0x161a1e,1.5));
 const light=new THREE.DirectionalLight(0xc8d5e2,1.15);light.position.set(22,30,16);light.castShadow=true;scene.add(light);
@@ -226,7 +226,7 @@ function installTouch(){
  $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.shadowMap.enabled=innerWidth>800});
 async function bootGame(){
  setBoot('Cargando Tekaym Online · Mundo cúbico…');
  await loadAssets();
