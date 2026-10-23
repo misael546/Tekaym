@@ -22,7 +22,7 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 ## Controles
 
 ### PC
-- WASD: moverse.
+- WASD: moverse; Shift: correr y gastar resistencia.
 - Mouse: mirar.
 - Clic izquierdo: minar.
 - Clic derecho: colocar el bloque seleccionado.
@@ -30,7 +30,7 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 - Espacio o botón ATACAR: atacar.
 
 ### Android / pantalla táctil
-- Joystick izquierdo: moverse.
+- Joystick izquierdo: moverse; botón CORRER: sprint.
 - Joystick derecho: mirar.
 - Botones MINAR, COLOCAR, BLOQUE y ATAQUE.
 - El panel de inventario y fabricación se puede desplazar.
