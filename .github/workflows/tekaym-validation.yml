@@ -214,3 +214,14 @@ jobs:
           if(!main.includes("zoneText.textContent=activeRoomCode.startsWith('local-')?'MUNDO LOCAL':'MUNDO '+activeRoomCode")) throw new Error('Local world HUD label should be short and readable');
           console.log('Multiplayer fallback, return-to-menu, and world HUD checks passed');
           NODE
+
+      
+      - name: Remove old prison-map worker logic
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          if(/makeCells|isInsideCell|randomCellSpawn|cellId|PRISION|CELDA/i.test(worker)) throw new Error('Old prison-map server logic remains');
+          if(!worker.includes('function randomZombieSpot()')||!worker.includes('function randomAnimalSpot(player')) throw new Error('Open-world creature spawning is missing');
+          console.log('Server no longer uses prison-cell exclusions or player cell IDs');
+          NODE
