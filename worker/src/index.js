@@ -223,7 +223,7 @@ export class GameRoom extends DurableObject {
     server.serializeAttachment(session);
     session.ws = server;
     this.sessions.set(session.id, session);
-    server.send(JSON.stringify({ type: 'connected', id: session.id, release: this.env.GAME_VERSION || 'V1', maxPlayers: MAX_PLAYERS, x: cell.x, z: cell.z, googleConfigured: Boolean(this.env.GOOGLE_CLIENT_ID) }));
+    server.send(JSON.stringify({ type: 'connected', id: session.id, release: this.env.GAME_VERSION || 'V1', maxPlayers: MAX_PLAYERS, x: spawn.x, z: spawn.z, googleConfigured: Boolean(this.env.GOOGLE_CLIENT_ID) }));
     this.persistSession(server, session);
     return new Response(null, { status: 101, webSocket: client });
   }
