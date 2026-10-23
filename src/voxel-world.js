@@ -240,22 +240,32 @@ export function createVoxelWorld(scene) {
     rebuildAt(x, z);
     return true;
   }
-  function isSolid(id) { return id !== BLOCK.AIR; }
-  function isSafeSpawn(x = 0, z = 0) {
-    ensureChunkData(chunkOf(x), chunkOf(z));
-    const bx = Math.floor(x), bz = Math.floor(z);
-    let top = 0;
-    for (let y = MAX_Y - 1; y >= 0; y--) if (isSolid(getBlock(bx, y, bz))) { top = y; break; }
-    const touched = new Set();
-    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
-      ensureChunkData(chunkOf(bx + dx), chunkOf(bz + dz));
-      for (let y = top + 1; y <= Math.min(MAX_Y - 1, top + 6); y++) {
-        const k = key(bx + dx, y, bz + dz);
-        if (getBlock(bx + dx, y, bz + dz)) { changes.set(k, BLOCK.AIR); putRaw(bx + dx, y, bz + dz, BLOCK.AIR); touched.add(chunkKey(chunkOf(bx + dx), chunkOf(bz + dz))); }
+  function findSafeSpawn(originX = 0, originZ = 0) {
+    for (let radius = 0; radius <= 24; radius++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          if (radius > 0 && Math.abs(dx) !== radius && Math.abs(dz) !== radius) continue;
+          const x = Math.floor(originX) + dx, z = Math.floor(originZ) + dz;
+          ensureChunkData(chunkOf(x), chunkOf(z));
+          let top = -1;
+          for (let y = Math.min(MAX_Y - 1, surfaceY(x, z)); y >= 0; y--) {
+            if (getBlock(x, y, z)) { top = y; break; }
+          }
+          if (top < 0) continue;
+          let clear = true;
+          for (let ox = -1; ox <= 1 && clear; ox++) for (let oz = -1; oz <= 1 && clear; oz++) {
+            ensureChunkData(chunkOf(x + ox), chunkOf(z + oz));
+            for (let y = top + 1; y <= top + 2; y++) {
+              if (getBlock(x + ox, y, z + oz)) { clear = false; break; }
+            }
+          }
+          if (clear) return new THREE.Vector3(x + 0.5, top + 2.65, z + 0.5);
+        }
       }
     }
-    for (const ck of touched) { const [cx, cz] = ck.split(',').map(Number); if (chunks.has(ck)) buildChunk(cx, cz); }
-    return new THREE.Vector3(x + 0.5, top + 2.65, z + 0.5);
+    const x = Math.floor(originX), z = Math.floor(originZ);
+    ensureChunkData(chunkOf(x), chunkOf(z));
+    return new THREE.Vector3(x + 0.5, surfaceY(x, z) + 2.65, z + 0.5);
   }
   function getHeightAt(x, z) {
     ensureChunkData(chunkOf(x), chunkOf(z));
@@ -323,8 +333,8 @@ export function createVoxelWorld(scene) {
   return {
     group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
     applyChanges, resetChanges, serializeChanges, blockName, updateStreaming,
-    safeSpawn: isSafeSpawn,
-    get spawn() { return isSafeSpawn(0, 0); },
+    safeSpawn: findSafeSpawn,
+    get spawn() { return findSafeSpawn(0, 0); },
     dispose
   };
 }
