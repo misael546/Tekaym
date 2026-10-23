@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {PointerLockControls} from 'three/addons/controls/PointerLockControls.js';
 import {GAME_VERSION,ASSETS,SERVER_URL,HTTP_SERVER_URL,WORLD} from './config.js';
-import {buildPrisonBlockout} from './prison.js';
+import {createVoxelWorld} from './voxel-world.js';
 
 const $=id=>document.getElementById(id);
 const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginStatus=$('loginStatus'),googleButton=$('googleButton');
-const hpText=$('hpText'),hpFill=$('hpFill'),stamText=$('stamText'),stamFill=$('stamFill'),hungerText=$('hungerText'),hungerFill=$('hungerFill'),thirstText=$('thirstText'),thirstFill=$('thirstFill'),zoneText=$('zoneText'),hint=$('hint'),damageFlash=$('damageFlash'),knifeHit=$('knifeHit');
+const hpText=$('hpText'),hpFill=$('hpFill'),stamText=$('stamText'),stamFill=$('stamFill'),hungerText=$('hungerText'),hungerFill=$('hungerFill'),thirstText=$('thirstText'),thirstFill=$('thirstFill'),zoneText=$('zoneText'),hint=$('hint'),damageFlash=$('damageFlash'),knifeHit=$('knifeHit'),mineButton=$('mineButton'),placeButton=$('placeButton'),inventoryText=$('inventoryText'),selectedText=$('selectedText');
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x050608);
@@ -18,9 +18,13 @@ const controls=new PointerLockControls(camera,renderer.domElement);scene.add(con
 scene.add(new THREE.HemisphereLight(0x9aa8b8,0x161a1e,1.5));
 const light=new THREE.DirectionalLight(0xc8d5e2,1.15);light.position.set(22,30,16);light.castShadow=true;scene.add(light);
 
-const prison=buildPrisonBlockout();scene.add(prison.group);
-const spawn=prison.cells[Math.floor(Math.random()*prison.cells.length)];
-controls.object.position.copy(spawn.spawn);zoneText.textContent='CELDA '+spawn.id;
+const voxelWorld=createVoxelWorld(scene);
+const spawn=voxelWorld.spawn;
+controls.object.position.copy(spawn);zoneText.textContent='MUNDO CÚBICO';
+const BLOCK=voxelWorld.BLOCK;
+const inventory={1:24,2:32,3:0,4:0,5:0,6:0};
+let selectedBlock=BLOCK.DIRT;
+try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1')||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
 const keys={w:false,a:false,s:false,d:false};
@@ -35,28 +39,53 @@ function updateHud(){
 function flash(){damageFlash.style.opacity='1';setTimeout(()=>damageFlash.style.opacity='0',120)}
 function loadModel(url,scale=1){return new Promise((resolve,reject)=>loader.load(url,g=>{g.scene.scale.setScalar(scale);resolve(g.scene)},undefined,reject))}
 async function loadAssets(){
- setBoot('Cargando prisión 3D…');
- try{const g=await loadModel(ASSETS.prisonStarter);g.position.set(-25,-.5,-45);g.rotation.y=Math.PI;assetRoot.add(g)}catch(e){console.warn('[TEKAYM] prison asset',e)}
- setBoot('Cargando infectados…');
- try{const g=await loadModel(ASSETS.zombieStarter,.9);g.position.set(50,0,55);assetRoot.add(g)}catch(e){console.warn('[TEKAYM] zombie asset',e)}
+ setBoot('Generando terreno cúbico…');
+ await new Promise(resolve=>requestAnimationFrame(resolve));
+ setBoot('Preparando zombis…');
+ try{const g=await loadModel(ASSETS.zombieStarter,.9);g.position.set(50,voxelWorld.getHeightAt(50,55)-1.65,55);assetRoot.add(g)}catch(e){console.warn('[TEKAYM] zombie asset',e)}
  try{const g=await loadModel(ASSETS.knife);g.scale.setScalar(.42);g.position.set(.26,-.28,-.55);g.rotation.set(-.4,.15,-.2);knife=g;camera.add(g)}catch(e){console.warn('[TEKAYM] knife asset',e);const h=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(.055,.34,.025),new THREE.MeshStandardMaterial({color:0xbfc7cf,metalness:.8,roughness:.28}));b.position.y=.12;h.add(b);const g=new THREE.Mesh(new THREE.BoxGeometry(.09,.16,.07),new THREE.MeshStandardMaterial({color:0x202327}));g.position.y=-.13;h.add(g);h.position.set(.25,-.3,-.55);knife=h;camera.add(h)}
  spawnProceduralZombies(18);
+ updateInventoryHud();
 }
 function randomZombiePosition(){
- for(let i=0;i<100;i++){const p=new THREE.Vector3((Math.random()*2-1)*96,0,(Math.random()*2-1)*78);let safe=true;for(const c of prison.cells){if(Math.hypot(p.x-c.center.x,p.z-c.center.z)<WORLD.zombieMinDistanceFromCells){safe=false;break}}if(safe)return p}
- return new THREE.Vector3(0,0,0);
+ for(let i=0;i<100;i++){const x=Math.floor((Math.random()*2-1)*48),z=Math.floor((Math.random()*2-1)*48);if(Math.hypot(x,z)<9)continue;return new THREE.Vector3(x,voxelWorld.getHeightAt(x,z)-1.65,z)}
+ return new THREE.Vector3(12,voxelWorld.getHeightAt(12,12)-1.65,12);
 }
 function spawnProceduralZombies(count){
  for(let i=0;i<count;i++){const z=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,5,8),new THREE.MeshStandardMaterial({color:0x77706b,roughness:.9}));body.position.y=.8;z.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),new THREE.MeshStandardMaterial({color:0x8d8882,roughness:.9}));head.position.y=1.55;z.add(head);z.position.copy(randomZombiePosition());z.userData={id:'z'+i,hp:45,speed:1.05+Math.random()*.5,phase:Math.random()*6.28};scene.add(z);zombies.push(z)}
 }
 function moveLocal(dt){
- const speed=player.stamina<15?2.1:3.8,v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);next.y=1.65;if(Math.abs(next.x)<108&&Math.abs(next.z)<88)controls.object.position.copy(next);player.stamina=Math.max(0,player.stamina-10*dt)}else player.stamina=Math.min(100,player.stamina+22*dt);
+ const speed=player.stamina<15?2.1:4.2,v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
+ if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=62;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-10*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
 }
 function updateNeeds(dt){
  player.hunger=Math.max(0,player.hunger-.18*dt);player.thirst=Math.max(0,player.thirst-.26*dt);
  if(player.hunger===0||player.thirst===0)player.hp=Math.max(0,player.hp-.8*dt);
  if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}
+}
+function saveWorld(){
+ try{localStorage.setItem('tekaym-voxel-save-v1',JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
+}
+function updateInventoryHud(){
+ if(inventoryText)inventoryText.textContent='TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0);
+ if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
+}
+function mineBlock(){
+ if(player.dead)return;
+ const id=voxelWorld.breakBlock(camera);
+ if(!id)return;
+ inventory[id]=(inventory[id]||0)+1;
+ updateInventoryHud();saveWorld();
+}
+function placeSelectedBlock(){
+ if(player.dead||(inventory[selectedBlock]||0)<1)return;
+ if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position)){
+  inventory[selectedBlock]--;updateInventoryHud();saveWorld();
+ }
+}
+function selectNextBlock(){
+ const ids=[BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.SAND,BLOCK.GRASS];
+ const at=Math.max(0,ids.indexOf(selectedBlock));selectedBlock=ids[(at+1)%ids.length];updateInventoryHud();saveWorld();
 }
 function attack(){
  if(player.dead||player.cooldown>0)return;
@@ -70,7 +99,14 @@ function attack(){
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
+addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();});
+addEventListener('mousedown',e=>{if(innerWidth>800&&controls.isLocked){if(e.button===0)mineBlock();if(e.button===2)placeSelectedBlock();}});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 knifeHit.addEventListener('click',attack);
+mineButton?.addEventListener('click',mineBlock);
+placeButton?.addEventListener('click',placeSelectedBlock);
+selectedText?.addEventListener('click',selectNextBlock);
+addEventListener('beforeunload',saveWorld);
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
 
 function showLogin(text){loginGate.classList.remove('hidden');loginStatus.textContent=text}
@@ -128,18 +164,18 @@ function installTouch(){
  look.addEventListener('pointerdown',e=>{li=e.pointerId;look.setPointerCapture(li)});
  look.addEventListener('pointermove',e=>{if(e.pointerId!==li)return;const v=point(look,lk,e);lookYaw-=v.x*.035;lookPitch=Math.max(-1.2,Math.min(1.2,lookPitch-v.y*.025));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch});
  look.addEventListener('pointerup',()=>{li=null;lk.style.transform='translate(0,0)'});
- $('touchAttack').addEventListener('click',attack);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
+ $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 async function bootGame(){
- setBoot('Cargando Tekaym Online V1…');
+ setBoot('Cargando Tekaym Online · Mundo cúbico…');
  await loadAssets();
  const serverNotConfigured=SERVER_URL.includes('YOUR-SUBDOMAIN')||SERVER_URL.includes('YOUR-TEKAYM');
  if(serverNotConfigured){
   connected=false;boot.classList.add('hidden');loginGate.classList.add('hidden');
-  hint.textContent='PROTOTIPO LOCAL · WASD para moverte · mouse para mirar · Espacio/ATACAR para usar el cuchillo. El multijugador se activa al conectar Cloudflare.';
-  zoneText.textContent='PRISIÓN · MODO LOCAL';
+  hint.textContent='MUNDO CÚBICO · WASD para moverte · clic para minar · clic derecho para colocar · R cambia bloque.';
+  zoneText.textContent='MUNDO PERSONAL · LOCAL';
   return;
  }
  await initGoogle();
@@ -147,5 +183,5 @@ async function bootGame(){
  if(!googleReady)showLogin('Configura Google y el servidor para iniciar sesión.');
 }
 bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('Error recuperable del prototipo.');setTimeout(()=>boot.classList.add('hidden'),700);const serverNotConfigured=SERVER_URL.includes('YOUR-SUBDOMAIN')||SERVER_URL.includes('YOUR-TEKAYM');if(serverNotConfigured)loginGate.classList.add('hidden');else initGoogle()});
-function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.rotation.y=Math.atan2(to.x,to.z)}}}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
+function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();requestAnimationFrame(animate);
