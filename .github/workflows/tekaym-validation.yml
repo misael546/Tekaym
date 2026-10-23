@@ -198,3 +198,23 @@ jobs:
           if(!h.includes('id="inventoryModal"')||!h.includes('id="recipeList"'))throw new Error('Inventory UI missing');
           console.log('Menu, movement, inventory, crafting, hotbar and empty-hand checks passed');
           NODE
+
+      - name: Validate landscape mobile controls and pixel-art blocks
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const apk=fs.readFileSync('.github/workflows/build-android-apk.yml','utf8');
+          const checks=[
+            [main.includes("screen.orientation.lock('landscape')"),'Browser landscape lock fallback missing'],
+            [main.includes("navigator.maxTouchPoints>0")&&main.includes("isTouchDevice?camera.rotation.y:0"),'Touch-device detection or camera-aligned movement missing'],
+            [main.includes("lookYaw-=dx*.006")&&main.includes("move.addEventListener('pointercancel',resetMove)")&&main.includes("look.addEventListener('pointercancel',resetLook)"),'Touch camera delta or pointer cancellation recovery missing'],
+            [html.includes("@media(pointer:coarse){#touch{display:block!important}"),'Touch HUD may disappear on a landscape phone'],
+            [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
+            [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation']
+          ];
+          for(const [ok,message] of checks)if(!ok)throw new Error(message);
+          console.log('Landscape mobile controls and pixel-art block checks passed');
+          NODE
