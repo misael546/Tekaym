@@ -74,6 +74,7 @@ jobs:
             [main.includes('function updateDayCycle')&&main.includes('function makeAnimal')&&main.includes('function eatFood'),'Day cycle, animals, and food survival missing'],
             [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchEat"'),'Day-night HUD and mobile eating missing'],
             [worker.includes('worldClock: this.worldClock')&&worker.includes("storage.put('worldClock', this.worldClock)"),'Shared persistent world clock missing'],
+            [worker.includes('if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;')&&worker.includes('const angle = Math.random() * Math.PI * 2, distance = 14 + Math.random() * 12'),'Hostile mobs must only move at night and spawn near players'],
             [main.includes("best.userData.type==='cow'")&&main.includes('inventory.rawBeef')&&main.includes('inventory.leather'),'Animal meat and drops missing'],
             [main.includes('function craftShovel')&&main.includes('function craftSword')&&main.includes('function craftStonePickaxe')&&main.includes('function craftIronPickaxe'),'Tool progression recipes missing'],
             [main.includes('function smeltIron')&&main.includes('function hasStation'),'Furnace and crafting station progression missing'],
