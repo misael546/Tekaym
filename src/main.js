@@ -25,7 +25,7 @@ zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
 const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,sword:0,stoneSword:0,craftingTable:0,furnace:0};
 let selectedBlock=BLOCK.DIRT;
-try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
+try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v2-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 controls.object.position.copy(voxelWorld.spawn);
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
@@ -75,7 +75,7 @@ function updateNeeds(dt){
  if(player.hunger===0||player.thirst===0)player.hp=Math.max(0,player.hp-.8*dt);
  if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}
 }
-function roomSaveKey(){return 'tekaym-voxel-save-v1-'+activeRoomCode}
+function roomSaveKey(){return 'tekaym-voxel-save-v2-'+activeRoomCode}
 function saveWorld(){
  try{localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
 }
@@ -89,7 +89,7 @@ function loadRoomInventory(){
  updateInventoryHud();
 }
 function updateInventoryHud(){
- if(inventoryText)inventoryText.textContent='TRONCOS '+inventory[BLOCK.WOOD]+' · PIEDRA '+inventory[BLOCK.STONE]+' · CARBÓN '+inventory.coal+' · HIERRO '+inventory[BLOCK.IRON_ORE]+' · LINGOTES '+inventory.ironIngot+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks+' · PICO MADERA '+inventory.pickaxe+' · PICO PIEDRA '+inventory.stonePickaxe+' · PICO HIERRO '+inventory.ironPickaxe;
+ if(inventoryText)inventoryText.textContent='TRONCOS '+inventory[BLOCK.WOOD]+' · PIEDRA '+inventory[BLOCK.STONE]+' · CARBÓN '+inventory.coal+' · HIERRO '+inventory[BLOCK.IRON_ORE]+' · LINGOTES '+inventory.ironIngot+' · TABLAS '+inventory[BLOCK.PLANKS]+' · PALOS '+inventory.sticks+' · PICO MADERA '+inventory.pickaxe+' · PICO PIEDRA '+inventory.stonePickaxe+' · PICO HIERRO '+inventory.ironPickaxe;
  if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
 }
 function mineBlock(){
@@ -99,7 +99,7 @@ function mineBlock(){
  const toolNeeded= id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
  if(toolNeeded&&!inventory[toolNeeded]){hint.textContent=toolNeeded==='pickaxe'?'Necesitas un pico de madera para picar piedra y carbón.':toolNeeded==='stonePickaxe'?'Necesitas un pico de piedra para extraer hierro.':'Necesitas un pico de hierro para extraer oro y diamante.';return;}
  const removed=voxelWorld.breakBlock(camera);if(!removed)return;
- const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:'planks',[BLOCK.CRAFTING_TABLE]:'craftingTable',[BLOCK.FURNACE]:'furnace' };
+ const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:'craftingTable',[BLOCK.FURNACE]:'furnace' };
  const drop=drops[removed];if(drop!==undefined)inventory[drop]=(inventory[drop]||0)+1;
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  updateInventoryHud();saveWorld();
@@ -119,22 +119,22 @@ function selectNextBlock(){
 }
 function craftPlanks(){
  if(inventory[BLOCK.WOOD]<1){hint.textContent='Tala un árbol y consigue un tronco primero.';return;}
- inventory[BLOCK.WOOD]--;inventory.planks+=4;hint.textContent='Fabricaste 4 tablas.';updateInventoryHud();saveWorld();
+ inventory[BLOCK.WOOD]--;inventory[BLOCK.PLANKS]=(inventory[BLOCK.PLANKS]||0)+4;hint.textContent='Fabricaste 4 tablas.';updateInventoryHud();saveWorld();
 }
 function craftSticks(){
- if(inventory.planks<2){hint.textContent='Necesitas 2 tablas para fabricar 4 palos.';return;}
- inventory.planks-=2;inventory.sticks+=4;hint.textContent='Fabricaste 4 palos.';updateInventoryHud();saveWorld();
+ if(inventory[BLOCK.PLANKS]<2){hint.textContent='Necesitas 2 tablas para fabricar 4 palos.';return;}
+ inventory[BLOCK.PLANKS]-=2;inventory.sticks+=4;hint.textContent='Fabricaste 4 palos.';updateInventoryHud();saveWorld();
 }
 function craftRecipe(cost,result,amount=1,label='Objeto'){
  for(const [item,n] of Object.entries(cost))if((inventory[item]||0)<n){hint.textContent=label+': te faltan recursos ('+n+' de '+item+').';return false;}
  for(const [item,n] of Object.entries(cost))inventory[item]-=n;
  inventory[result]=(inventory[result]||0)+amount;hint.textContent='Fabricaste: '+label;updateInventoryHud();saveWorld();return true;
 }
-function craftPickaxe(){craftRecipe({planks:3,sticks:2},'pickaxe',1,'Pico de madera');}
+function craftPickaxe(){craftRecipe({[BLOCK.PLANKS]:3,sticks:2},'pickaxe',1,'Pico de madera');}
 function craftAxe(){craftRecipe({planks:3,sticks:2},'axe',1,'Hacha de madera');}
-function craftShovel(){craftRecipe({planks:1,sticks:2},'shovel',1,'Pala de madera');}
-function craftSword(){craftRecipe({planks:2,sticks:1},'sword',1,'Espada de madera');}
-function craftTable(){craftRecipe({planks:4},BLOCK.CRAFTING_TABLE,1,'Mesa de trabajo');}
+function craftShovel(){craftRecipe({[BLOCK.PLANKS]:1,sticks:2},'shovel',1,'Pala de madera');}
+function craftSword(){craftRecipe({[BLOCK.PLANKS]:2,sticks:1},'sword',1,'Espada de madera');}
+function craftTable(){craftRecipe({[BLOCK.PLANKS]:4},BLOCK.CRAFTING_TABLE,1,'Mesa de trabajo');}
 function craftStonePickaxe(){craftRecipe({3:3,sticks:2},'stonePickaxe',1,'Pico de piedra');}
 function craftStoneAxe(){craftRecipe({3:3,sticks:2},'stoneAxe',1,'Hacha de piedra');}
 function craftStoneSword(){craftRecipe({3:2,sticks:1},'stoneSword',1,'Espada de piedra');}
@@ -147,7 +147,7 @@ function attack(){
  let best=null,bestD=2.25;
  for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
  if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
- else if(!connected&&best){best.userData.hp-=inventory.axe>0?30:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
+ else if(!connected&&best){best.userData.hp-=inventory.stoneSword>0?45:inventory.sword>0?30:inventory.axe>0?28:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
@@ -242,7 +242,7 @@ function installTouch(){
  look.addEventListener('pointerdown',e=>{li=e.pointerId;look.setPointerCapture(li)});
  look.addEventListener('pointermove',e=>{if(e.pointerId!==li)return;const v=point(look,lk,e);lookYaw-=v.x*.035;lookPitch=Math.max(-1.2,Math.min(1.2,lookPitch-v.y*.025));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch});
  look.addEventListener('pointerup',()=>{li=null;lk.style.transform='translate(0,0)'});
- $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
+ $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchSword')?.addEventListener('click',craftSword);$('touchShovel')?.addEventListener('click',craftShovel);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.shadowMap.enabled=innerWidth>800});
