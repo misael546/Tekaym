@@ -16,7 +16,7 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 - Correr con Shift en PC y botón CORRER en móvil; consume resistencia.
 - Aparición sobre terreno generado con espacio libre alrededor y sin estructuras encima.
 - Ciclo compartido por mundo de 20 minutos: día, atardecer, noche y amanecer; cambia el color del cielo, la niebla y la iluminación.
-- Pollos, cerdos y vacas deambulan cerca del jugador durante el día. Al cazarlos sueltan pollo, cerdo o res crudos; vacas pueden soltar cuero y pollos plumas.
+- Pollos, cerdos y vacas son entidades compartidas del servidor: todos ven la misma posición y salud, deambulan, reaparecen y sueltan recursos autorizados por el servidor. Vacas dan carne de res y pueden dar cuero; cerdos dan carne de cerdo; pollos dan pollo y pueden dar plumas.
 - La carne cruda se puede comer con F en PC o COMER en móvil para recuperar hambre.
 - Los zombis se activan por la noche y se acercan a los jugadores; durante el día dejan de perseguir y atacar.
 - Colisión básica con bloques y ajuste de altura al terreno.
