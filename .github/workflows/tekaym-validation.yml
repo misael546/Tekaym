@@ -196,7 +196,7 @@ jobs:
           const fs=require('fs');
           const html=fs.readFileSync('index.html','utf8');
           const main=fs.readFileSync('src/main.js','utf8');
-          if (/\\bCELDA\\b/i.test(html) || /\\bCELDA\\b/i.test(main)) throw new Error('Obsolete prison-world label found in the main game UI');
+          if (/\bCELDA\b/i.test(html) || /\bCELDA\b/i.test(main)) throw new Error('Obsolete prison-world label found in the main game UI');
           if (!html.includes('id="zoneText"') || !main.includes("zoneText.textContent='MUNDO '+activeRoomCode")) throw new Error('Current world label is missing');
           console.log('Main world HUD labels are clean');
           NODE
