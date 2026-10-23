@@ -1,28 +1,49 @@
 # Tekaym Online
 
-Tekaym Online is a standalone 3D first-person multiplayer survival-horror game for the web.
+Juego de supervivencia 3D en primera persona, en transición desde el prototipo de prisión hacia un mundo cúbico construible. Proyecto independiente de NeonCore y DarkPixel Online.
 
-## V1
-- Large prison complex.
-- 4 cell blocks × 16 cells = 64 cells.
-- Player starts in a randomly selected open cell.
-- Zombies never spawn inside protected cells.
-- Knife-only starting combat.
-- Health, stamina, hunger and thirst.
-- PC and mobile touch controls.
-- 16-player multiplayer foundation.
-- Google account authentication foundation.
-- Belmo WebSocket/HTTP server foundation.
-- Dedicated Firebase Firestore persistence.
-- One official release version only: V1.
+## Base cúbica integrada en la rama de desarrollo
 
-## Separation
-This repository is independent from NeonCore/DarkPixel Online.
-Do not copy DarkPixel files, assets, databases or update systems into this repository.
+- Terreno procedural de bloques: pasto, tierra, piedra, arena, madera y hojas.
+- Chunks para agrupar la geometría y dibujar solo las caras visibles.
+- Romper y colocar bloques con controles de PC y botones táctiles.
+- Inventario inicial de recursos y selección de bloque para construir.
+- Recetas iniciales: madera a tablas, tablas a palos, pico y hacha.
+- Colisión básica con bloques y ajuste de altura al terreno.
+- Guardado local del mundo modificado e inventario en el navegador/dispositivo.
+- Se conservan los sistemas existentes de vida, resistencia, hambre, sed y zombis.
 
-## Deployment
-GitHub Pages publishes the client.
-Belmo runs only the `server/` service.
-Firebase Firestore is the dedicated persistent database for Tekaym Online.
+## Controles
 
-See `docs/game-design.md` and `docs/asset-sources.md` for the base design and asset policy.
+### PC
+- WASD: moverse.
+- Mouse: mirar.
+- Clic izquierdo: minar.
+- Clic derecho: colocar el bloque seleccionado.
+- E: minar; Q: colocar; R: cambiar bloque.
+- Espacio o botón ATACAR: atacar.
+
+### Android / pantalla táctil
+- Joystick izquierdo: moverse.
+- Joystick derecho: mirar.
+- Botones MINAR, COLOCAR, BLOQUE y ATAQUE.
+- El panel de inventario y fabricación se puede desplazar.
+
+## Desarrollo pendiente
+
+- Sincronización autoritativa de los bloques con el servidor.
+- Mundos personales compartibles mediante códigos de invitación.
+- Guardado remoto de los mundos y acceso de amigos.
+- Mejoras de IA, animaciones, herramientas y recetas.
+- Empaquetado y pruebas de una APK Android.
+
+La URL del Worker sigue pendiente de configurar en `src/config.js`; por eso la base multijugador no debe considerarse lista. El guardado actual de bloques es local al dispositivo/navegador y todavía no se comparte entre amigos.
+
+## Arquitectura existente
+
+- Cliente Three.js.
+- Cloudflare Workers + Durable Objects para el backend previsto.
+- Firebase/Firestore para cuentas y progreso previsto.
+- GitHub Pages para el cliente web.
+
+No guardar secretos en GitHub. No copiar archivos, bases de datos ni sistemas de DarkPixel o NeonCore a este repositorio.
