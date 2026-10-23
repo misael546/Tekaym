@@ -68,7 +68,7 @@ jobs:
             [voxel.includes("RENDER_DISTANCE")&&voxel.includes("updateStreaming"),'Dynamic chunk streaming missing'],
             [voxel.includes("function unloadChunkData")&&voxel.includes("blocks.delete(key(x, y, z))"),'Chunk data unloading missing'],
             [voxel.includes('COAL_ORE')&&voxel.includes('IRON_ORE')&&voxel.includes('DIAMOND_ORE'),'Survival ore generation missing'],
-            [voxel.includes('safeSpawn: isSafeSpawn')&&voxel.includes('top + 6'),'Safe spawn clearing missing'],
+            [voxel.includes('safeSpawn: findSafeSpawn')&&voxel.includes('function findSafeSpawn')&&voxel.includes('return new THREE.Vector3(x + 0.5, top + 2.65, z + 0.5)'),'Safe spawn selection missing'],
             [main.includes('function craftShovel')&&main.includes('function craftSword')&&main.includes('function craftStonePickaxe')&&main.includes('function craftIronPickaxe'),'Tool progression recipes missing'],
             [main.includes('function smeltIron')&&main.includes('function hasStation'),'Furnace and crafting station progression missing'],
             [main.includes("keys.shift")&&html.includes('id="touchRun"'),'Sprint controls missing'],
