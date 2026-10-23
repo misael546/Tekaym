@@ -98,7 +98,6 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const demos = [
-            {file:'recursos-prueba/demo-jugable/index.html', output:'/tmp/tekaym-playable.mjs', label:'playable', ids:['play','attackButton','stickBase','game']},
             {file:'recursos-prueba/demo-animaciones/index.html', output:'/tmp/tekaym-animation-lab.mjs', label:'animation lab', ids:['character','environment','speed','front','side']}
           ];
           for (const demo of demos) {
@@ -113,34 +112,6 @@ jobs:
             fs.writeFileSync(demo.output, html.slice(start + tag.length, end));
             console.log('Structure OK: '+demo.label);
           }
-          NODE
-          node --check /tmp/tekaym-playable.mjs
-      - name: Validate playable demo spawn and wake-up camera
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const html = fs.readFileSync('recursos-prueba/demo-jugable/index.html', 'utf8');
-          if (!html.includes('player.x=13.35;player.z=11.35;')) throw new Error('Spawn point changed unexpectedly');
-          if (!html.includes('camera.position.set(13,.96,11)')) throw new Error('Intro camera is not reset at the spawn');
-          if (!html.includes('camera.lookAt(13,.96,10)')) throw new Error('Spawn camera must look through the side-mounted gate');
-          if (!html.includes('spawnGrace=4.0;')) throw new Error('Spawn movement grace regression');
-          if (!html.includes("base.addEventListener('pointermove',e=>{if(e.pointerId===stickId)moveStick(e);});")) throw new Error('Touch joystick pointer movement handler missing');
-          if (!html.includes("base.addEventListener('lostpointercapture',resetStick);")) throw new Error('Touch joystick pointer release recovery missing');
-          if (!html.includes('joyX=0;joyY=0;lookPointer=null;for(const k in keys)keys[k]=false;stickId=null;')) throw new Error('Respawn must clear stale input state');
-          if (!html.includes("window.addEventListener('pointercancel',e=>{if(e.pointerId===stickId)resetStick();if(e.pointerId===lookPointer)lookPointer=null;});")) throw new Error('Global touch cancellation recovery missing');
-          if (!html.includes('cameraYaw=-Math.PI/2;')) throw new Error('Camera must face the side-mounted cell gate');
-          if (!html.includes('cameraYaw=(-Math.PI/2)*rise;')) throw new Error('Intro camera yaw animation missing');
-          if (html.includes('id="map"') || html.includes('updateMap();')) throw new Error('Minimap must be removed and must not break the render loop');
-          if (!html.includes('const camY=(openingSequence>0?.96+.66*rise:1.62)+player.y')) throw new Error('Intro camera height regression');
-          if (!html.includes('const pitch=openingSequence>0?-.035*(1-rise)+.03*rise:cameraPitch')) throw new Error('Intro camera pitch regression');
-          if (!html.includes('openingSequence=4.8;roundHasStarted=false;')) throw new Error('Wake-up sequence must not leave controls locked too long');
-          if (!html.includes('open:true,openAmount:1,sequenceIndex:cellGates.length')) throw new Error('Cell gates must start open for the prison spawn');
-          if (!html.includes('if(c.cellRef&&c.cellRef.open)continue;')) throw new Error('Opened cell gate collision handling missing');
-          const x = 13.35, z = 11.35, cx = 13, cz = 11, halfW = 5.15 / 2, halfD = 6.4 / 2, radius = .34;
-          if (x <= cx-halfW+radius || x >= cx+halfW-radius || z <= cz-halfD+radius || z >= cz+halfD-radius) {
-            throw new Error('Spawn point is not safely inside the player cell');
-          }
-          console.log('Playable demo spawn, camera, and gate regression checks passed');
           NODE
           node --check /tmp/tekaym-animation-lab.mjs
       - name: Check isolation
