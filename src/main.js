@@ -9,14 +9,14 @@ const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginSt
 const hpText=$('hpText'),hpFill=$('hpFill'),stamText=$('stamText'),stamFill=$('stamFill'),hungerText=$('hungerText'),hungerFill=$('hungerFill'),thirstText=$('thirstText'),thirstFill=$('thirstFill'),zoneText=$('zoneText'),hint=$('hint'),damageFlash=$('damageFlash'),knifeHit=$('knifeHit'),mineButton=$('mineButton'),placeButton=$('placeButton'),inventoryText=$('inventoryText'),selectedText=$('selectedText');
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x050608);
-scene.fog=new THREE.Fog(0x050608,42,165);
+scene.background=new THREE.Color(0x8bc5e8);
+scene.fog=new THREE.Fog(0x8bc5e8,52,125);
 const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,260);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=innerWidth>800;document.body.appendChild(renderer.domElement);
 const controls=new PointerLockControls(camera,renderer.domElement);scene.add(controls.object);
-scene.add(new THREE.HemisphereLight(0x9aa8b8,0x161a1e,1.5));
-const light=new THREE.DirectionalLight(0xc8d5e2,1.15);light.position.set(22,30,16);light.castShadow=true;scene.add(light);
+scene.add(new THREE.HemisphereLight(0xb9e3ff,0x4b613c,1.65));
+const light=new THREE.DirectionalLight(0xffe2b8,1.6);light.position.set(22,30,16);light.castShadow=true;scene.add(light);
 
 const voxelWorld=createVoxelWorld(scene);
 const spawn=voxelWorld.spawn;
@@ -42,8 +42,7 @@ function loadModel(url,scale=1){return new Promise((resolve,reject)=>loader.load
 async function loadAssets(){
  setBoot('Generando terreno cúbico…');
  await new Promise(resolve=>requestAnimationFrame(resolve));
- setBoot('Preparando zombis…');
- try{const g=await loadModel(ASSETS.zombieStarter,.9);g.position.set(50,voxelWorld.getHeightAt(50,55)-1.65,55);assetRoot.add(g)}catch(e){console.warn('[TEKAYM] zombie asset',e)}
+ setBoot('Preparando herramientas…');
  try{const g=await loadModel(ASSETS.knife);g.scale.setScalar(.42);g.position.set(.26,-.28,-.55);g.rotation.set(-.4,.15,-.2);knife=g;camera.add(g)}catch(e){console.warn('[TEKAYM] knife asset',e);const h=new THREE.Group();const b=new THREE.Mesh(new THREE.BoxGeometry(.055,.34,.025),new THREE.MeshStandardMaterial({color:0xbfc7cf,metalness:.8,roughness:.28}));b.position.y=.12;h.add(b);const g=new THREE.Mesh(new THREE.BoxGeometry(.09,.16,.07),new THREE.MeshStandardMaterial({color:0x202327}));g.position.y=-.13;h.add(g);h.position.set(.25,-.3,-.55);knife=h;camera.add(h)}
  spawnProceduralZombies(18);
  updateInventoryHud();
