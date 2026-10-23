@@ -27,6 +27,23 @@ jobs:
         run: npm run build:web
       - name: Generate Android project
         run: npx cap add android
+      - name: Lock Android game orientation to landscape
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(path, 'utf8');
+          const activity = /<activity\b[^>]*android:name="\.MainActivity"[^>]*>/s;
+          const match = xml.match(activity);
+          if (!match) throw new Error('Capacitor MainActivity not found in AndroidManifest.xml');
+          let tag = match[0];
+          if (/android:screenOrientation="[^"]+"/.test(tag)) tag = tag.replace(/android:screenOrientation="[^"]+"/, 'android:screenOrientation="landscape"');
+          else tag = tag.replace(/>$/, ' android:screenOrientation="landscape">');
+          xml = xml.replace(activity, tag);
+          fs.writeFileSync(path, xml);
+          if (!xml.includes('android:screenOrientation="landscape"')) throw new Error('Landscape orientation was not applied');
+          console.log('Android activity locked to landscape');
+          NODE
       - name: Sync Android assets
         run: npx cap sync android
       - name: Build debug-signed APK
