@@ -1,65 +1,49 @@
-# Tekaym Online — Diseño base V1
+# Tekaym Online — Diseño del juego
 
-## Identidad
-Survival horror 3D en primera persona para navegador. Proyecto completamente independiente de otros juegos.
+## Dirección
 
-## Arquitectura
-GitHub publica el cliente mediante GitHub Pages.
-Cloudflare Workers + Durable Objects ejecutan el backend multiplayer mediante WebSocket/HTTP.
-Firebase Firestore es la base de datos dedicada para cuentas y progreso persistente.
-Existe una sola versión oficial del proyecto: V1, V2, V3…
+Juego de supervivencia 3D en primera persona con mundo cúbico, construcción por bloques, recolección, fabricación, zombis y necesidades de supervivencia. La antigua prisión queda como prototipo de origen; la dirección jugable nueva es un mundo abierto cúbico.
 
-## Mundo
-La prisión es grande, cerrada y explorable.
-V1 define cuatro bloques de celdas con 16 celdas cada uno: 64 celdas.
-Cada celda está abierta al inicio y sirve como punto de aparición.
-Los zombis no aparecen dentro de las celdas protegidas.
+## Mundo cúbico
 
-Zonas iniciales:
-- Bloques A/B/C/D.
-- Corredores principales y transversales.
-- Comedor.
-- Gimnasio.
-- Patio.
-- Duchas.
-- Lavandería.
-- Enfermería.
-- Taller.
-- Visitas.
-- Control.
-- Mantenimiento.
-- Almacenes.
-- Ingreso y seguridad.
+- Terreno procedural con chunks.
+- Bloques iniciales: pasto, tierra, piedra, arena, madera y hojas.
+- La geometría solo genera las caras expuestas de los bloques.
+- Romper bloques, recoger materiales y colocar bloques.
+- El terreno y los cambios del jugador deben persistir.
+- El movimiento debe respetar el terreno y evitar atravesar bloques.
+- Próximas mejoras: cuevas, minerales, agua, biomas, iluminación y generación por semilla.
 
-## Supervivencia
-Vida, resistencia, hambre y sed.
-El sistema futuro añadirá ruido, infección, sangrado, temperatura, iluminación, sueño opcional y estados médicos.
+## Supervivencia y combate
 
-## Combate
-El jugador comienza únicamente con un cuchillo.
-Ataque melee en primera persona.
-V1 no incluye armas de fuego.
-El servidor debe validar daño y estado real antes de guardar progreso.
+- Vida, resistencia, hambre y sed existentes.
+- Zombis que persiguen al jugador en el prototipo local.
+- Cuchillo inicial y recetas de pico/hacha en la primera iteración.
+- Próximas mejoras: durabilidad, daño por herramienta, armadura, curación, ciclos día/noche y dificultad progresiva.
 
-## Zombis
-Variantes futuras: caminante, corredor, crawler, gritón, inflado, blindado, spitters y brutes.
-Nunca deben aparecer dentro de celdas protegidas.
-La IA final usará sectores, navegación, percepción, ruido y límites de persecución.
+## Inventario y fabricación
 
-## Eventos
-Se planean apagones, alarmas, generadores, puertas de emergencia, brotes, sectores bloqueados y eventos de evacuación.
-El objetivo de la partida evolucionará hacia sobrevivir, conseguir recursos y encontrar una salida.
+- Inventario básico de bloques y materiales.
+- Recetas iniciales: madera → tablas; tablas → palos; tablas + palos → pico/hacha.
+- Las recetas iniciales preparan el sistema; se ampliarán con estaciones de trabajo y herramientas con efectos reales.
+- Guardado local de los cambios del mundo e inventario.
 
-## Multiplayer
-Máximo inicial de 16 jugadores por instancia.
-La replicación y las reglas importantes serán server-authoritative.
+## Android
 
-## Progresión
-No utilizar monedas ni sistemas de DarkPixel.
-V1 solo prepara persistencia y cuenta.
-Más adelante: nivel de supervivencia, habilidades, recetas, logros y finales.
+- Reutilizar el cliente Three.js y controles táctiles existentes.
+- Mantener botones de minería, colocación, selección de bloque y ataque.
+- Optimizar chunks, geometría, sombras y resolución para dispositivos modestos.
+- Después de estabilizar el juego web, empaquetarlo como APK y probar en dispositivos reales.
 
-## Seguridad y datos
-Firebase se usa solo desde el backend mediante Firebase Admin.
-Los secretos nunca se guardan en GitHub.
-El cliente no escribe directamente la economía, inventario o progreso persistente.
+## Multijugador y mundos personales
+
+- El objetivo es que el jugador cree un mundo personal y comparta un código de invitación.
+- En el modelo A, los amigos solo podrán entrar mientras el anfitrión tenga el juego abierto.
+- La conexión móvil normalmente requiere un servicio de señalización/relay o un servidor accesible; no se debe asumir que el teléfono puede aceptar conexiones entrantes.
+- El servidor debe validar movimiento, bloques colocados/rotos, inventario y daño.
+- Las modificaciones del mundo deben sincronizarse y guardarse remotamente antes de considerar esta función terminada.
+- Estado actual: la URL del Worker aún es un placeholder y la edición de bloques solo se guarda localmente. Invitaciones y mundos compartidos aún no están implementados.
+
+## Seguridad y aislamiento
+
+Tekaym Online es independiente de NeonCore y DarkPixel Online. No reutilizar sus bases de datos, secretos, sistemas de actualización ni economía. Las credenciales deben permanecer en el backend y fuera del repositorio.
