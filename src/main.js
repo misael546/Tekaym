@@ -131,7 +131,7 @@ function craftRecipe(cost,result,amount=1,label='Objeto'){
  inventory[result]=(inventory[result]||0)+amount;hint.textContent='Fabricaste: '+label;updateInventoryHud();saveWorld();return true;
 }
 function craftPickaxe(){craftRecipe({[BLOCK.PLANKS]:3,sticks:2},'pickaxe',1,'Pico de madera');}
-function craftAxe(){craftRecipe({planks:3,sticks:2},'axe',1,'Hacha de madera');}
+function craftAxe(){craftRecipe({[BLOCK.PLANKS]:3,sticks:2},'axe',1,'Hacha de madera');}
 function craftShovel(){craftRecipe({[BLOCK.PLANKS]:1,sticks:2},'shovel',1,'Pala de madera');}
 function craftSword(){craftRecipe({[BLOCK.PLANKS]:2,sticks:1},'sword',1,'Espada de madera');}
 function craftTable(){craftRecipe({[BLOCK.PLANKS]:4},BLOCK.CRAFTING_TABLE,1,'Mesa de trabajo');}
