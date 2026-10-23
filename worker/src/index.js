@@ -129,40 +129,10 @@ async function verifyGoogle(idToken, env) {
   if (!payload.sub) throw new Error('Identidad de Google inválida');
   return { sub: String(payload.sub), email: String(payload.email || ''), name: safeText(payload.name || payload.email || 'Jugador', 20) };
 }
-function makeCells() {
-  const cells = [];
-  const offsets = [[-65, -48], [65, -48], [-65, 48], [65, 48]];
-  for (let area = 0; area < offsets.length; area++) {
-    const ox = offsets[area][0], oz = offsets[area][1];
-    for (let side = 0; side < 2; side++) {
-      for (let i = 0; i < 8; i++) {
-        const x = ox + (i - 3.5) * 4;
-        const z = oz + (side === 0 ? -11 : 11);
-        cells.push({
-          id: String.fromCharCode(65 + area) + '-' + String(i + 1).padStart(2, '0') + (side ? 'B' : 'A'),
-          x,
-          z: z + (side === 0 ? -1.2 : 1.2),
-          centerX: x,
-          centerZ: z
-        });
-      }
-    }
-  }
-  return cells;
-}
-const CELLS = makeCells();
-function isInsideCell(x, z, margin = 0) {
-  return CELLS.some(cell => Math.abs(x - cell.centerX) < 2 - margin && Math.abs(z - cell.centerZ) < 2.5 - margin);
-}
-function randomCellSpawn() { return CELLS[Math.floor(Math.random() * CELLS.length)]; }
 function randomZombieSpot() {
-  for (let attempt = 0; attempt < 250; attempt++) {
-    const x = (Math.random() * 2 - 1) * 54;
-    const z = (Math.random() * 2 - 1) * 54;
-    if (!isInsideCell(x, z, -0.1)) return { x, z };
-  }
-  return { x: 0, z: 0 };
+  return { x: (Math.random() * 2 - 1) * 54, z: (Math.random() * 2 - 1) * 54 };
 }
+
 function createZombies() {
   return Array.from({ length: MAX_ZOMBIES }, (_, i) => {
     const pos = randomZombieSpot();
@@ -173,14 +143,12 @@ function createZombies() {
 const MAX_ANIMALS = 10;
 const ANIMAL_TYPES = ['chicken', 'pig', 'cow'];
 function randomAnimalSpot(player, min = 8, max = 26) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const angle = Math.random() * Math.PI * 2;
-    const distance = min + Math.random() * (max - min);
-    const x = clamp(Math.round(player.x + Math.cos(angle) * distance), WORLD.minX, WORLD.maxX);
-    const z = clamp(Math.round(player.z + Math.sin(angle) * distance), WORLD.minZ, WORLD.maxZ);
-    if (!isInsideCell(x, z, -0.1)) return { x, z };
-  }
-  return { x: clamp(player.x + min, WORLD.minX, WORLD.maxX), z: clamp(player.z, WORLD.minZ, WORLD.maxZ) };
+  const angle = Math.random() * Math.PI * 2;
+  const distance = min + Math.random() * (max - min);
+  return {
+    x: clamp(Math.round(player.x + Math.cos(angle) * distance), WORLD.minX, WORLD.maxX),
+    z: clamp(Math.round(player.z + Math.sin(angle) * distance), WORLD.minZ, WORLD.maxZ)
+  };
 }
 function createAnimal(type, player) {
   const pos = randomAnimalSpot(player);
@@ -244,10 +212,10 @@ export class GameRoom extends DurableObject {
     if (this.sessions.size >= MAX_PLAYERS) return json({ ok: false, error: 'Servidor lleno', maxPlayers: MAX_PLAYERS }, 503);
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
-    const cell = { x: Math.round((Math.random() * 12 - 6) * 10) / 10, z: Math.round((Math.random() * 12 - 6) * 10) / 10, id: 'MUNDO' };
+    const spawn = { x: Math.round((Math.random() * 12 - 6) * 10) / 10, z: Math.round((Math.random() * 12 - 6) * 10) / 10 };
     const session = {
       id: uid(), name: 'Jugador', googleSub: '', email: '',
-      x: cell.x, z: cell.z, cellId: cell.id,
+      x: spawn.x, z: spawn.z,
       hp: 100, maxHp: 100, stamina: 100, hunger: 100, thirst: 100,
       joined: false, lastMove: 0, lastAttack: 0, lastSave: Date.now(), lastNeeds: Date.now()
     };
@@ -255,7 +223,7 @@ export class GameRoom extends DurableObject {
     server.serializeAttachment(session);
     session.ws = server;
     this.sessions.set(session.id, session);
-    server.send(JSON.stringify({ type: 'connected', id: session.id, release: this.env.GAME_VERSION || 'V1', maxPlayers: MAX_PLAYERS, cellId: cell.id, x: cell.x, z: cell.z, googleConfigured: Boolean(this.env.GOOGLE_CLIENT_ID) }));
+    server.send(JSON.stringify({ type: 'connected', id: session.id, release: this.env.GAME_VERSION || 'V1', maxPlayers: MAX_PLAYERS, x: cell.x, z: cell.z, googleConfigured: Boolean(this.env.GOOGLE_CLIENT_ID) }));
     this.persistSession(server, session);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -310,7 +278,7 @@ export class GameRoom extends DurableObject {
       const distance = 24 + Math.random() * 8;
       const x = clamp(player.x + Math.cos(angle) * distance, WORLD.minX, WORLD.maxX);
       const z = clamp(player.z + Math.sin(angle) * distance, WORLD.minZ, WORLD.maxZ);
-      if (!this.isTorchProtected(x, z) && !isInsideCell(x, z, 0)) return { x, z };
+      if (!this.isTorchProtected(x, z)) return { x, z };
     }
     return randomZombieSpot();
   }
@@ -345,7 +313,7 @@ export class GameRoom extends DurableObject {
       const distance = Math.min(zombie.speed * step, length);
       const nextX = clamp(zombie.x + dx / length * distance, WORLD.minX, WORLD.maxX);
       const nextZ = clamp(zombie.z + dz / length * distance, WORLD.minZ, WORLD.maxZ);
-      if (!isInsideCell(nextX, nextZ, 0)) { zombie.x = nextX; zombie.z = nextZ; }
+      zombie.x = nextX; zombie.z = nextZ;
       if (Math.hypot(target.x - zombie.x, target.z - zombie.z) <= 1.35 && Date.now() - Number(zombie.lastHit || 0) > 1200) {
         zombie.lastHit = Date.now();
         target.hp = clamp(target.hp - 8, 0, target.maxHp);
@@ -387,7 +355,7 @@ export class GameRoom extends DurableObject {
       const speed = Number(animal.speed) || 0.34;
       const nx = clamp(animal.x + Math.sin(animal.dir) * speed * step, WORLD.minX, WORLD.maxX);
       const nz = clamp(animal.z + Math.cos(animal.dir) * speed * step, WORLD.minZ, WORLD.maxZ);
-      if (!isInsideCell(nx, nz, 0)) { animal.x = nx; animal.z = nz; }
+      animal.x = nx; animal.z = nz;
       const nearest = Math.min(...active.map(p => Math.hypot(p.x - animal.x, p.z - animal.z)));
       if (nearest > 62) {
         animal.hp = 0;
@@ -402,7 +370,7 @@ export class GameRoom extends DurableObject {
       worldClock: this.worldClock,
       players: [...this.sessions.values()].filter(p => p.joined).map(p => ({
         id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp,
-        stamina: p.stamina, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId
+        stamina: p.stamina, hunger: p.hunger, thirst: p.thirst
       })),
       zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp })),
       animals: this.animals.map(a => ({ id: a.id, type: a.type, x: a.x, z: a.z, hp: a.hp, maxHp: a.maxHp }))
@@ -420,7 +388,7 @@ export class GameRoom extends DurableObject {
     try { msg = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); } catch { return; }
 
     if (msg.type === 'join') {
-      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, blocks: [...this.blocks.values()], worldClock: this.worldClock }); return; }
+      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst }, blocks: [...this.blocks.values()], worldClock: this.worldClock }); return; }
       try {
         const google = await verifyGoogle(String(msg.googleIdToken || ''), this.env);
         if (this.roomOwnerSub && google.sub !== this.roomOwnerSub && ![...this.sessions.values()].some(s => s.joined && s.googleSub === this.roomOwnerSub)) {
@@ -439,7 +407,6 @@ export class GameRoom extends DurableObject {
         if (saved) {
           p.x = clamp(Number(saved.x ?? p.x), WORLD.minX, WORLD.maxX);
           p.z = clamp(Number(saved.z ?? p.z), WORLD.minZ, WORLD.maxZ);
-          p.cellId = String(saved.cellId || 'PRISION');
           p.hp = clamp(Number(saved.hp ?? 100), 1, p.maxHp);
           p.hunger = clamp(Number(saved.hunger ?? 100), 0, 100);
           p.thirst = clamp(Number(saved.thirst ?? 100), 0, 100);
@@ -449,7 +416,7 @@ export class GameRoom extends DurableObject {
         this.persistSession(ws, p);
         this.ensureAnimalsNearPlayers();
         await this.ctx.storage.put('animals', this.animals);
-        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, worldClock: this.worldClock });
+        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst }, worldClock: this.worldClock });
         this.broadcastState();
       } catch (error) {
         this.send(ws, { type: 'auth_error', message: error && error.message ? error.message : 'Autenticación inválida.' });
@@ -527,7 +494,7 @@ export class GameRoom extends DurableObject {
   }
 
   playerSaveData(p) {
-    return { name: p.name, cellId: p.cellId, x: p.x, z: p.z, hp: p.hp, hunger: p.hunger, thirst: p.thirst };
+    return { name: p.name, x: p.x, z: p.z, hp: p.hp, hunger: p.hunger, thirst: p.thirst };
   }
 
   async webSocketClose(ws) {
