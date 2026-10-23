@@ -257,7 +257,7 @@ function applyState(m){
  for(const data of m.zombies||[]){
   const zombie=zombies.find(z=>z.userData.id===data.id);if(!zombie)continue;
   zombie.userData.hp=Number(data.hp??zombie.userData.hp);zombie.userData.targetX=Number(data.x);zombie.userData.targetZ=Number(data.z);
-  zombie.visible=zombie.userData.hp>0&&isNight();
+  zombie.visible=zombie.userData.hp>0&&isNight()&&Number(String(zombie.userData.id).slice(1))<7;
  }
 }
 function sendMove(now){
