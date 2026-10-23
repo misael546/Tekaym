@@ -209,7 +209,7 @@ export function createVoxelWorld(scene) {
     const hit = targetFromCamera(camera);
     if (!hit) return false;
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
-    if (x < -HALF_WORLD || x >= HALF_WORLD || z < -HALF_WORLD || z >= HALF_WORLD || getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
+    if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
     if (playerPosition && Math.abs(x + 0.5 - playerPosition.x) < 0.8 && Math.abs(z + 0.5 - playerPosition.z) < 0.8 && y < playerPosition.y + 1.8 && y + 1 > playerPosition.y - 1.8) return false;
     const k = key(x, y, z);
     if (!changes.has(k)) originals.set(k, getBlock(x, y, z));
@@ -254,7 +254,7 @@ export function createVoxelWorld(scene) {
       if (chunks.has(ck)) buildChunk(cx, cz);
     }
   }
-  function resetChanges() {
+  function resetChanges(position = new THREE.Vector3(0.5, 0, 0.5)) {
     for (const [k, id] of originals) {
       const [x, y, z] = k.split(',').map(Number);
       putRaw(x, y, z, id);
@@ -263,7 +263,7 @@ export function createVoxelWorld(scene) {
     originals.clear();
     for (const mesh of chunks.values()) { group.remove(mesh); mesh.geometry.dispose(); }
     chunks.clear(); blocks.clear(); dataChunks.clear();
-    updateStreaming(new THREE.Vector3(0.5, 0, 0.5));
+    updateStreaming(position);
   }
   function serializeChanges() {
     return Array.from(changes, ([k, id]) => {
