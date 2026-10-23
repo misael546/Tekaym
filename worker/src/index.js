@@ -392,8 +392,8 @@ export class GameRoom extends DurableObject {
       if (![x, y, z, id].every(Number.isInteger) || x < -64 || x > 63 || z < -64 || z > 63 || y < 0 || y > 27 || id < 0 || id > 6) return;
       if (Math.hypot(p.x - x, p.z - z) > 7) return;
       const key = x + ',' + y + ',' + z;
-      if (id === 0) this.blocks.delete(key);
-      else this.blocks.set(key, { x, y, z, id });
+      // Keep AIR edits as tombstones so generated terrain stays broken for later visitors.
+      this.blocks.set(key, { x, y, z, id });
       await this.ctx.storage.put('blocks', [...this.blocks.values()]);
       this.broadcast({ type: 'block_edit', x, y, z, id });
       return;
