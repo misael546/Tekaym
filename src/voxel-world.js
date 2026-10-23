@@ -104,9 +104,10 @@ export function createVoxelWorld(scene) {
     dataChunks.delete(chunkKey(cx, cz));
     const minX = cx * CHUNK_SIZE, maxX = minX + CHUNK_SIZE;
     const minZ = cz * CHUNK_SIZE, maxZ = minZ + CHUNK_SIZE;
-    for (const k of Array.from(blocks.keys())) {
-      const [x, , z] = k.split(',').map(Number);
-      if (x >= minX && x < maxX && z >= minZ && z < maxZ) blocks.delete(k);
+    for (let x = minX; x < maxX; x++) {
+      for (let z = minZ; z < maxZ; z++) {
+        for (let y = 0; y < MAX_Y; y++) blocks.delete(key(x, y, z));
+      }
     }
   }
   function updateStreaming(position) {
