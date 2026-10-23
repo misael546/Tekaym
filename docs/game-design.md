@@ -52,3 +52,8 @@ Tekaym Online es independiente de NeonCore y DarkPixel Online. No reutilizar sus
 ## Ciclo de día y noche, animales y enemigos
 
 Cada mundo usa un reloj compartido de 1200 segundos (20 minutos) persistido por el Durable Object: día, atardecer, noche y amanecer. El cliente interpola el cielo, la niebla, el color e intensidad de la luz solar y la iluminación ambiental. Los zombis solo se mueven y atacan durante la franja nocturna; se reubican a una distancia jugable alrededor de jugadores activos. En la superficie, el servidor mantiene entidades persistentes compartidas de pollos, cerdos y vacas, crea una población cerca de los jugadores durante el día, controla sus posiciones y salud, actualiza su movimiento, y gestiona su reaparición. El estado se guarda en el almacenamiento del mundo y se transmite a todos los clientes. El servidor valida la distancia al atacar y decide las recompensas: vacas dan carne de res y posibilidad de cuero; cerdos dan cerdo; pollos dan pollo y posibilidad de plumas. El cliente receptor aplica las recompensas a su inventario local. La carne cruda puede consumirse para recuperar hambre.
+
+
+## Supervivencia: cocina e iluminación
+
+El horno se fabrica con ocho piedras y usa carbón como combustible. Cada carbón representa ocho operaciones de cocción/fundición; cocinar una pieza tarda diez segundos. Carne cocida restaura más hambre que carne cruda. Cuatro antorchas se fabrican con carbón y un palo. Las antorchas iluminan y bloquean la aparición natural de zombis dentro de una aproximación de radio Manhattan 11, tanto en local como en multijugador. El audio ambiental y los efectos se sintetizan con Web Audio.

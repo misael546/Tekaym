@@ -224,7 +224,7 @@ export class GameRoom extends DurableObject {
     if (Array.isArray(savedBlocks)) {
       for (const block of savedBlocks) {
         if (!block || !Number.isInteger(block.x) || !Number.isInteger(block.y) || !Number.isInteger(block.z) || !Number.isInteger(block.id)) continue;
-        if (Math.abs(block.x) > 100000 || Math.abs(block.z) > 100000 || block.y < 0 || block.y > 47 || block.id < 0 || block.id > 13) continue;
+        if (Math.abs(block.x) > 100000 || Math.abs(block.z) > 100000 || block.y < 0 || block.y > 47 || block.id < 0 || block.id > 14) continue;
         this.blocks.set(block.x + ',' + block.y + ',' + block.z, block);
       }
     }
@@ -297,13 +297,33 @@ export class GameRoom extends DurableObject {
     if (session.hunger <= 0 || session.thirst <= 0) session.hp = clamp(session.hp - elapsed * 0.8, 0, session.maxHp);
   }
 
+  isTorchProtected(x, z) {
+    for (const block of this.blocks.values()) {
+      if (block.id === 14 && Math.abs(x - block.x) + Math.abs(z - block.z) <= 11) return true;
+    }
+    return false;
+  }
+
+  zombieSpawnNear(player) {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 24 + Math.random() * 8;
+      const x = clamp(player.x + Math.cos(angle) * distance, WORLD.minX, WORLD.maxX);
+      const z = clamp(player.z + Math.sin(angle) * distance, WORLD.minZ, WORLD.maxZ);
+      if (!this.isTorchProtected(x, z) && !isInsideCell(x, z, 0)) return { x, z };
+    }
+    return randomZombieSpot();
+  }
+
   moveZombies(dt) {
     if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;
     const step = clamp(dt, 0, 0.75);
     for (const zombie of this.zombies) {
       if (zombie.hp <= 0) {
         if (zombie.respawnAt && Date.now() >= zombie.respawnAt) {
-          const pos = randomZombieSpot();
+          const players = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+          const target = players.length ? players[Math.floor(Math.random() * players.length)] : null;
+          const pos = target ? this.zombieSpawnNear(target) : randomZombieSpot();
           zombie.x = pos.x; zombie.z = pos.z; zombie.hp = zombie.maxHp; zombie.respawnAt = 0;
         }
         continue;
@@ -316,10 +336,8 @@ export class GameRoom extends DurableObject {
       }
       if (!target) continue;
       if (best > 28) {
-        const angle = Math.random() * Math.PI * 2, distance = 14 + Math.random() * 12;
-        zombie.x = clamp(target.x + Math.cos(angle) * distance, WORLD.minX, WORLD.maxX);
-        zombie.z = clamp(target.z + Math.sin(angle) * distance, WORLD.minZ, WORLD.maxZ);
-        if (isInsideCell(zombie.x, zombie.z, 0)) zombie.x = clamp(zombie.x + 8, WORLD.minX, WORLD.maxX);
+        const pos = this.zombieSpawnNear(target);
+        zombie.x = pos.x; zombie.z = pos.z;
         continue;
       }
       const dx = target.x - zombie.x, dz = target.z - zombie.z;
@@ -493,7 +511,7 @@ export class GameRoom extends DurableObject {
     }
     if (msg.type === 'block_edit') {
       const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), id = Number(msg.id);
-      if (![x, y, z, id].every(Number.isInteger) || Math.abs(x) > 100000 || Math.abs(z) > 100000 || y < 0 || y > 47 || id < 0 || id > 13) return;
+      if (![x, y, z, id].every(Number.isInteger) || Math.abs(x) > 100000 || Math.abs(z) > 100000 || y < 0 || y > 47 || id < 0 || id > 14) return;
       if (Math.hypot(p.x - x, p.z - z) > 7) return;
       const key = x + ',' + y + ',' + z;
       // Keep AIR edits as tombstones so generated terrain stays broken for later visitors.

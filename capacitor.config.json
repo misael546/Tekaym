@@ -1,0 +1,8 @@
+{
+  "appId": "com.tekaym.online",
+  "appName": "Tekaym Online",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 const CHUNK_SIZE = 16;
 const RENDER_DISTANCE = typeof window !== 'undefined' && window.innerWidth <= 800 ? 1 : 2;
 const MAX_Y = 48;
-const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6, COAL_ORE: 7, IRON_ORE: 8, GOLD_ORE: 9, DIAMOND_ORE: 10, PLANKS: 11, CRAFTING_TABLE: 12, FURNACE: 13 });
+const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6, COAL_ORE: 7, IRON_ORE: 8, GOLD_ORE: 9, DIAMOND_ORE: 10, PLANKS: 11, CRAFTING_TABLE: 12, FURNACE: 13, TORCH: 14 });
 const COLORS = {
   [BLOCK.GRASS]: new THREE.Color(0x609447),
   [BLOCK.DIRT]: new THREE.Color(0x79553a),
@@ -17,7 +17,8 @@ const COLORS = {
   [BLOCK.DIAMOND_ORE]: new THREE.Color(0x45d9d2),
   [BLOCK.PLANKS]: new THREE.Color(0xb98a52),
   [BLOCK.CRAFTING_TABLE]: new THREE.Color(0x8b5b32),
-  [BLOCK.FURNACE]: new THREE.Color(0x55565a)
+  [BLOCK.FURNACE]: new THREE.Color(0x55565a),
+  [BLOCK.TORCH]: new THREE.Color(0xe9a24b)
 };
 const DIRECTIONS = [
   { n: [1, 0, 0], v: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
@@ -35,9 +36,9 @@ function hash(x, z, seed = 7919) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
 function terrainHeight(x, z) {
-  const broad = Math.sin(x * 0.075) * 2.4 + Math.cos(z * 0.061) * 2.1;
-  const detail = Math.sin((x + z) * 0.17) * 0.8 + Math.cos((x - z) * 0.13) * 0.55;
-  return Math.max(3, Math.min(13, Math.floor(6 + broad + detail)));
+  const broad = Math.sin(x * 0.055) * 4.1 + Math.cos(z * 0.047) * 3.6;
+  const detail = Math.sin((x + z) * 0.15) * 1.25 + Math.cos((x - z) * 0.11) * 0.9;
+  return Math.max(4, Math.min(18, Math.floor(9 + broad + detail)));
 }
 
 export function createVoxelWorld(scene) {
@@ -83,9 +84,22 @@ export function createVoxelWorld(scene) {
             if (y < 8 && ore > 0.997) id = BLOCK.DIAMOND_ORE;
             else if (y < 13 && ore > 0.992) id = BLOCK.GOLD_ORE;
             else if (y < 20 && ore > 0.965) id = BLOCK.IRON_ORE;
-            else if (ore > 0.925) id = BLOCK.COAL_ORE;
+            else if (ore > 0.993) id = BLOCK.COAL_ORE;
           }
           putRaw(x, y, z, id);
+        }
+      }
+    }
+    // Coal appears in small connected veins inside stone, including higher exposed hillsides.
+    for (let vx = startX; vx < startX + CHUNK_SIZE; vx += 4) {
+      for (let vz = startZ; vz < startZ + CHUNK_SIZE; vz += 4) {
+        if (hash(vx, vz, seed + 901) < 0.48) continue;
+        const top = surfaceY(vx, vz), depth = Math.max(1, top - 3);
+        const cy = 2 + Math.floor(hash(vz, vx, seed + 902) * depth);
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+          const chance = hash(vx + dx, vz + dz, seed + cy * 17);
+          const bx = vx + dx, by = cy + (chance > 0.62 ? 1 : 0), bz = vz + dz;
+          if (by > 1 && by < surfaceY(bx, bz) - 1 && getBlock(bx, by, bz) === BLOCK.STONE && chance > 0.18) putRaw(bx, by, bz, BLOCK.COAL_ORE);
         }
       }
     }
@@ -163,6 +177,20 @@ export function createVoxelWorld(scene) {
           const id = getBlock(x, y, z);
           if (!id) continue;
           const base = COLORS[id];
+          if (id === BLOCK.TORCH) {
+            const prism = (x0, y0, z0, x1, y1, z1, color) => {
+              for (const dir of DIRECTIONS) {
+                for (const v of dir.v) {
+                  positions.push(x0 + v[0] * (x1-x0), y0 + v[1] * (y1-y0), z0 + v[2] * (z1-z0));
+                  colors.push(color.r, color.g, color.b);
+                }
+                indices.push(vertex, vertex+1, vertex+2, vertex, vertex+2, vertex+3); vertex += 4;
+              }
+            };
+            prism(x+.43,y,z+.43,x+.57,y+.72,z+.57,new THREE.Color(0x76502e));
+            prism(x+.34,y+.58,z+.34,x+.66,y+.86,z+.66,new THREE.Color(0xffa332));
+            continue;
+          }
           for (let face = 0; face < DIRECTIONS.length; face++) {
             const dir = DIRECTIONS[face];
             if (getBlock(x + dir.n[0], y + dir.n[1], z + dir.n[2])) continue;
@@ -283,7 +311,7 @@ export function createVoxelWorld(scene) {
       if (entry.y < 0 || entry.y >= MAX_Y) continue;
       ensureChunkData(chunkOf(entry.x), chunkOf(entry.z));
       const id = Number(entry.id);
-      if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.FURNACE) continue;
+      if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.TORCH) continue;
       const k = key(entry.x, entry.y, entry.z);
       if (!changes.has(k)) originals.set(k, getBlock(entry.x, entry.y, entry.z));
       putRaw(entry.x, entry.y, entry.z, id);
@@ -322,7 +350,7 @@ export function createVoxelWorld(scene) {
     });
   }
   function blockName(id) {
-    return ({1:'Pasto',2:'Tierra',3:'Piedra',4:'Arena',5:'Madera',6:'Hojas',7:'Mineral de carbón',8:'Mineral de hierro',9:'Mineral de oro',10:'Mineral de diamante',11:'Tablas',12:'Mesa de trabajo',13:'Horno'})[id] || 'Bloque';
+    return ({1:'Pasto',2:'Tierra',3:'Piedra',4:'Arena',5:'Madera',6:'Hojas',7:'Mineral de carbón',8:'Mineral de hierro',9:'Mineral de oro',10:'Mineral de diamante',11:'Tablas',12:'Mesa de trabajo',13:'Horno',14:'Antorcha'})[id] || 'Bloque';
   }
   function dispose() {
     for (const mesh of chunks.values()) mesh.geometry.dispose();

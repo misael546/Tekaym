@@ -164,3 +164,22 @@ jobs:
           if(!r.clientPath.includes('/index.html'))throw new Error('Client path invalid');
           console.log('Version synchronization OK -> '+r.version);
           NODE
+
+      - name: Validate survival cooking, torches, and Android packaging
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          if(!main.includes('function cookMeat()')||!main.includes('furnaceQueue.push')||!main.includes('function updateFurnace(dt)'))throw new Error('Timed meat cooking missing');
+          if(!main.includes('function consumeFurnaceFuel()')||!main.includes('inventory.furnaceFuel=8'))throw new Error('Coal fuel must process eight items');
+          if(!main.includes('cookedBeef')||!main.includes('player.hunger+(cooked?55:28)'))throw new Error('Cooked food hunger benefit missing');
+          if(!main.includes('function syncTorchLights()')||!main.includes('function isTorchProtected'))throw new Error('Torch lighting or spawn protection missing');
+          if(!voxel.includes('TORCH: 14')||!voxel.includes("14:'Antorcha'")||!voxel.includes('Coal appears in small connected veins'))throw new Error('Torch block or coal veins missing');
+          if(!worker.includes('isTorchProtected(x, z)')||!worker.includes('block.id > 14'))throw new Error('Multiplayer torch support missing');
+          if(!html.includes('id="cookMeat"')||!html.includes('id="craftTorch"')||!html.includes('id="audioToggle"'))throw new Error('Survival controls missing');
+          if(!fs.existsSync('capacitor.config.json')||!fs.existsSync('.github/workflows/build-android-apk.yml'))throw new Error('Android APK workflow/config missing');
+          console.log('Survival systems and Android packaging checks passed');
+          NODE

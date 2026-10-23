@@ -58,3 +58,12 @@ La rama de desarrollo ya contiene rutas para crear salas, entrar con código y s
 - GitHub Pages para el cliente web.
 
 No guardar secretos en GitHub. No copiar archivos, bases de datos ni sistemas de DarkPixel o NeonCore a este repositorio.
+
+
+## Horno, carbón, antorchas y audio
+
+- Las vetas de carbón se generan en depósitos conectados dentro de la piedra; cada unidad de carbón permite procesar hasta ocho piezas en el horno.
+- Fabrica un horno con ocho bloques de piedra, colócalo y cocina carne cruda. Cada pieza tarda diez segundos y la carne cocida restaura más hambre.
+- Fabrica palos con tablas y crea cuatro antorchas con un palo y carbón. Las antorchas iluminan casas y cuevas y protegen contra la aparición natural de zombis en su radio iluminado.
+- Los efectos de sonido y la música ambiental se sintetizan localmente con Web Audio, sin pistas de terceros.
+- El workflow Android construye un APK de depuración firmado automáticamente para pruebas; no es una firma de publicación para Google Play.
