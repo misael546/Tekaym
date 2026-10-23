@@ -72,6 +72,7 @@ jobs:
             [voxel.includes('naturalTop); y >= 0; y--'),'Ground height must not snap the player onto tree canopies'],
             [main.includes('function craftIronSword')&&main.includes('function craftIronAxe')&&main.includes('function craftIronShovel'),'Iron tool recipes missing'],
             [main.includes('function updateDayCycle')&&main.includes('function makeAnimal')&&main.includes('function eatFood'),'Day cycle, animals, and food survival missing'],
+            [main.includes('sunMesh')&&main.includes('moonMesh')&&main.includes('starField.visible=nowNight'),'Sun, moon, and night stars missing'],
             [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchEat"'),'Day-night HUD and mobile eating missing'],
             [worker.includes('worldClock: this.worldClock')&&worker.includes("storage.put('worldClock', this.worldClock)"),'Shared persistent world clock missing'],
             [worker.includes('if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;')&&worker.includes('const angle = Math.random() * Math.PI * 2, distance = 14 + Math.random() * 12'),'Hostile mobs must only move at night and spawn near players'],
