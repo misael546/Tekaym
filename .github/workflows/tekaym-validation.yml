@@ -182,7 +182,8 @@ jobs:
             [main.includes("lookYaw-=dx*.006")&&main.includes("move.addEventListener('pointercancel',resetMove)")&&main.includes("look.addEventListener('pointercancel',resetLook)"),'Touch camera delta or pointer cancellation recovery missing'],
             [html.includes("@media(pointer:coarse){#touch{display:block!important}"),'Touch HUD may disappear on a landscape phone'],
             [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
-            [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation']
+            [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation'],
+            [main.includes('lastAutoSave>10000')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
           ];
           for(const [ok,message] of checks)if(!ok)throw new Error(message);
           console.log('Landscape mobile controls and pixel-art block checks passed');
