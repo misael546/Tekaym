@@ -33,9 +33,11 @@ jobs:
           cp src/main.js /tmp/tekaym-main.mjs
           cp src/config.js /tmp/tekaym-config.mjs
           cp src/prison.js /tmp/tekaym-prison.mjs
+          cp src/voxel-world.js /tmp/tekaym-voxel-world.mjs
           node --check /tmp/tekaym-main.mjs
           node --check /tmp/tekaym-config.mjs
           node --check /tmp/tekaym-prison.mjs
+          node --check /tmp/tekaym-voxel-world.mjs
       - name: Check client structure
         run: |
           test -f index.html
@@ -43,6 +45,7 @@ jobs:
           test -f src/main.js
           test -f src/config.js
           test -f src/prison.js
+          test -f src/voxel-world.js
           test -f worker/src/index.js
           test -f worker/wrangler.jsonc
           test -f firestore.rules
