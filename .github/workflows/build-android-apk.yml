@@ -3,7 +3,7 @@ name: Build signed Android test APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, voxel-world-foundation]
+    branches: [main]
 
 permissions:
   contents: read
