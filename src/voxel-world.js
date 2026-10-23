@@ -195,7 +195,8 @@ export function createVoxelWorld(scene) {
             const dir = DIRECTIONS[face];
             if (getBlock(x + dir.n[0], y + dir.n[1], z + dir.n[2])) continue;
             const shade = face === 2 ? 1 : face === 3 ? 0.58 : (face < 2 ? 0.78 : 0.88);
-            const c = base.clone().multiplyScalar(shade);
+            const variation = 0.88 + hash(x + face * 17, y + id * 7, z + seed) * 0.24;
+            const c = base.clone().multiplyScalar(shade * variation);
             for (const v of dir.v) {
               positions.push(x + v[0], y + v[1], z + v[2]);
               colors.push(c.r, c.g, c.b);

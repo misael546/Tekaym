@@ -205,6 +205,7 @@ addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock()
 $('eatFood')?.addEventListener('click',eatFood);
 addEventListener('mousedown',e=>{if(innerWidth>800&&controls.isLocked){if(e.button===0)mineBlock();if(e.button===2)placeSelectedBlock();}});
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+renderer.domElement.addEventListener('pointerdown',()=>{if(!ambientOn)toggleMusic()},{once:true});
 knifeHit.addEventListener('click',attack);
 mineButton?.addEventListener('click',mineBlock);
 placeButton?.addEventListener('click',placeSelectedBlock);
@@ -303,7 +304,7 @@ function installTouch(){
  look.addEventListener('pointerdown',e=>{li=e.pointerId;look.setPointerCapture(li)});
  look.addEventListener('pointermove',e=>{if(e.pointerId!==li)return;const v=point(look,lk,e);lookYaw-=v.x*.035;lookPitch=Math.max(-1.2,Math.min(1.2,lookPitch-v.y*.025));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch});
  look.addEventListener('pointerup',()=>{li=null;lk.style.transform='translate(0,0)'});
- $('touchAttack').addEventListener('click',attack);$('touchEat')?.addEventListener('click',eatFood);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchSword')?.addEventListener('click',craftSword);$('touchShovel')?.addEventListener('click',craftShovel);$('touchRun')?.addEventListener('click',()=>{keys.shift=!keys.shift;$('touchRun').textContent=keys.shift?'CORRIENDO':'CORRER';});$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
+ $('touchAttack').addEventListener('click',attack);$('touchEat')?.addEventListener('click',eatFood);$('touchCook')?.addEventListener('click',cookMeat);$('touchTorch')?.addEventListener('click',()=>craftRecipe({sticks:1,coal:1},BLOCK.TORCH,4,'4 antorchas'));$('touchMusic')?.addEventListener('click',toggleMusic);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchSword')?.addEventListener('click',craftSword);$('touchShovel')?.addEventListener('click',craftShovel);$('touchRun')?.addEventListener('click',()=>{keys.shift=!keys.shift;$('touchRun').textContent=keys.shift?'CORRIENDO':'CORRER';});$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.shadowMap.enabled=innerWidth>800});
