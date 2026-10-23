@@ -7,6 +7,7 @@ import {createVoxelWorld} from './voxel-world.js';
 const $=id=>document.getElementById(id);
 const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginStatus=$('loginStatus'),googleButton=$('googleButton');
 const hpText=$('hpText'),hpFill=$('hpFill'),stamText=$('stamText'),stamFill=$('stamFill'),hungerText=$('hungerText'),hungerFill=$('hungerFill'),thirstText=$('thirstText'),thirstFill=$('thirstFill'),zoneText=$('zoneText'),hint=$('hint'),damageFlash=$('damageFlash'),knifeHit=$('knifeHit'),mineButton=$('mineButton'),placeButton=$('placeButton'),inventoryText=$('inventoryText'),selectedText=$('selectedText');
+let activeRoomCode='main';
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x8bc5e8);
@@ -24,13 +25,13 @@ zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
 const inventory={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
 let selectedBlock=BLOCK.DIRT;
-try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1')||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
+try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 controls.object.position.copy(voxelWorld.spawn);
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
 const keys={w:false,a:false,s:false,d:false};
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false};
-let knife=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,googleReady=false,connected=false,activeRoomCode='main';
+let knife=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,googleReady=false,connected=false;
 
 function setBoot(text){if(bootStatus)bootStatus.textContent=text}
 function updateHud(){
@@ -72,8 +73,18 @@ function updateNeeds(dt){
  if(player.hunger===0||player.thirst===0)player.hp=Math.max(0,player.hp-.8*dt);
  if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}
 }
+function roomSaveKey(){return 'tekaym-voxel-save-v1-'+activeRoomCode}
 function saveWorld(){
- try{localStorage.setItem('tekaym-voxel-save-v1',JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
+ try{localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
+}
+function loadRoomInventory(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(roomSaveKey())||'null');
+  const defaults={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
+  for(const id of Object.keys(inventory))inventory[id]=saved?.inventory&&id in saved.inventory?Math.max(0,Math.min(9999,Number(saved.inventory[id])||0)):defaults[id]||0;
+  selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;
+ }catch(e){console.warn('[TEKAYM] No se pudo cargar el inventario del mundo',e)}
+ updateInventoryHud();
 }
 function updateInventoryHud(){
  if(inventoryText)inventoryText.textContent='TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0)+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks;
@@ -190,8 +201,8 @@ function startSocket(fromLogin=false){
  try{
   socket=new WebSocket(url);
   socket.addEventListener('open',()=>{socket.send(JSON.stringify({type:'join',version:GAME_VERSION,googleIdToken}))});
-  socket.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.type==='connected'){player.id=m.id;if(Number.isFinite(Number(m.x))&&Number.isFinite(Number(m.z))){controls.object.position.set(Number(m.x),1.65,Number(m.z));zoneText.textContent='CELDA '+String(m.cellId||'');}}else if(m.type==='joined'){player.name=m.player.name||player.name;player.hp=Number(m.player.hp??player.hp);player.hunger=Number(m.player.hunger??player.hunger);player.thirst=Number(m.player.thirst??player.thirst);if(Array.isArray(m.blocks))voxelWorld.applyChanges(m.blocks);if(Number.isFinite(Number(m.player.x))&&Number.isFinite(Number(m.player.z)))controls.object.position.set(Number(m.player.x),voxelWorld.getHeightAt(Number(m.player.x),Number(m.player.z)),Number(m.player.z));zoneText.textContent='MUNDO '+activeRoomCode;connected=true;loginGate.classList.add('hidden');boot.classList.add('hidden');applyState({players:[m.player]});saveWorld();}else if(m.type==='block_edit'){voxelWorld.applyChanges([{x:Number(m.x),y:Number(m.y),z:Number(m.z),id:Number(m.id)}]);saveWorld();}else if(m.type==='room_closed'){showLogin(m.message||'El anfitrión no está conectado.');try{socket?.close()}catch{}connected=false;}else if(m.type==='auth_error'){showLogin(m.message||'Cuenta no válida.')}else if(m.type==='auth_required'){showLogin('Inicia sesión con Google para entrar.')}else if(m.type==='attack_ack'){const hit=zombies.find(z=>z.userData.id===m.targetId);if(hit&&Number.isFinite(Number(m.zombieHp))){hit.userData.hp=Number(m.zombieHp);hit.visible=hit.userData.hp>0;}}else if(m.type==='state'){applyState(m)}else if(m.type==='chat'){console.log('[CHAT]',m.from,m.text)}});
-  socket.addEventListener('close',()=>{if(!player.dead&&fromLogin)showLogin('Conexión cerrada. Reintentando…')});
+  socket.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.type==='connected'){player.id=m.id;if(Number.isFinite(Number(m.x))&&Number.isFinite(Number(m.z))){controls.object.position.set(Number(m.x),1.65,Number(m.z));zoneText.textContent='CELDA '+String(m.cellId||'');}}else if(m.type==='joined'){player.name=m.player.name||player.name;player.hp=Number(m.player.hp??player.hp);player.hunger=Number(m.player.hunger??player.hunger);player.thirst=Number(m.player.thirst??player.thirst);voxelWorld.resetChanges();if(Array.isArray(m.blocks))voxelWorld.applyChanges(m.blocks);loadRoomInventory();if(Number.isFinite(Number(m.player.x))&&Number.isFinite(Number(m.player.z)))controls.object.position.set(Number(m.player.x),voxelWorld.getHeightAt(Number(m.player.x),Number(m.player.z)),Number(m.player.z));zoneText.textContent='MUNDO '+activeRoomCode;connected=true;loginGate.classList.add('hidden');boot.classList.add('hidden');applyState({players:[m.player]});saveWorld();}else if(m.type==='block_edit'){voxelWorld.applyChanges([{x:Number(m.x),y:Number(m.y),z:Number(m.z),id:Number(m.id)}]);saveWorld();}else if(m.type==='room_closed'){showLogin(m.message||'El anfitrión no está conectado.');try{socket?.close()}catch{}connected=false;}else if(m.type==='auth_error'){showLogin(m.message||'Cuenta no válida.')}else if(m.type==='auth_required'){showLogin('Inicia sesión con Google para entrar.')}else if(m.type==='attack_ack'){const hit=zombies.find(z=>z.userData.id===m.targetId);if(hit&&Number.isFinite(Number(m.zombieHp))){hit.userData.hp=Number(m.zombieHp);hit.visible=hit.userData.hp>0;}}else if(m.type==='state'){applyState(m)}else if(m.type==='chat'){console.log('[CHAT]',m.from,m.text)}});
+  socket.addEventListener('close',()=>{connected=false;if(!player.dead&&fromLogin)showLogin('Conexión cerrada. Crea o únete al mundo para volver a entrar.')});
  }catch(e){console.error('[TEKAYM WS]',e);showLogin('No se pudo conectar con el servidor.')}
 }
 function applyState(m){
