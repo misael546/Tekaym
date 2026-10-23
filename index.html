@@ -25,7 +25,13 @@
 #damageFlash{position:fixed;inset:0;background:#c9151526;opacity:0;z-index:22;pointer-events:none}
 #touch{position:fixed;inset:0;display:none;pointer-events:none;z-index:25}.stick{position:absolute;bottom:26px;width:118px;height:118px;border:1px solid #54657a;border-radius:50%;background:#0a1018aa;pointer-events:auto}.stick.left{left:22px}.stick.right{right:22px}.knob{position:absolute;left:37px;top:37px;width:44px;height:44px;border-radius:50%;background:#c8d4e2aa;border:1px solid #dbe7f3}
 .touchAction,.touchFs{position:absolute;border-radius:50%;border:1px solid #63778e;background:#142334dd;color:#fff;font-weight:900;pointer-events:auto}.touchAction{right:166px;bottom:34px;width:74px;height:74px}.touchFs{right:16px;top:154px;width:46px;height:46px;border-radius:11px}
-@media(max-width:800px){#touch{display:block}.hint{bottom:152px}.bottom{bottom:145px}.version{top:7px}.cross{font-size:16px}}
+.worldbar{position:fixed;right:12px;top:58px;display:grid;gap:6px;max-width:min(210px,48vw);padding:8px;border:1px solid #314052;border-radius:12px;background:#03070bdc;z-index:24;pointer-events:auto}
+.worldbar .invline{font-size:10px;color:#d7e2ef;line-height:1.45}.worldbar .worldbtn{padding:8px 10px;border:1px solid #465b70;border-radius:8px;background:#142334;color:#f2f6fa;font-size:11px;font-weight:800}
+.worldbar .selected{color:#d7e6a0;cursor:pointer}
+.touchWorldActions{position:absolute;right:16px;top:212px;display:grid;gap:7px;pointer-events:auto}
+.touchWorldActions button{min-width:72px;padding:10px 8px;border:1px solid #63778e;border-radius:10px;background:#142334ee;color:#fff;font-size:10px;font-weight:900}
+@media(min-width:801px){.touchWorldActions{display:none}}
+@media(max-width:800px){#touch{display:block}.hint{bottom:152px;max-width:70vw;white-space:normal;text-align:center}.bottom{bottom:145px}.version{top:7px}.cross{font-size:16px}.worldbar{top:58px;right:8px;max-width:42vw;padding:6px}.worldbar .worldbtn{padding:7px;font-size:10px}.worldbar .invline{font-size:9px}.touchWorldActions{top:210px;right:10px}}
 </style>
 </head>
 <body>
@@ -38,10 +44,16 @@
     <div class="needs"><div class="meter"><div class="meterHead"><span>HAMBRE</span><b id="hungerText">100%</b></div><div class="track"><div id="hungerFill" class="fill"></div></div></div><div class="meter"><div class="meterHead"><span>SED</span><b id="thirstText">100%</b></div><div class="track"><div id="thirstFill" class="fill"></div></div></div></div>
   </div>
   <div class="zone" id="zoneText">CELDA</div><div class="version">V1</div><div class="cross">+</div>
-  <div class="hint" id="hint">WASD · Mouse para mirar · Espacio para atacar · ESC libera el cursor</div>
+  <div class="hint" id="hint">WASD · Mouse para mirar · clic para minar · clic derecho para colocar</div>
+  <div class="worldbar">
+    <div class="invline" id="inventoryText">TIERRA 32 · PIEDRA 0 · MADERA 0</div>
+    <button class="worldbtn selected" id="selectedText" type="button">BLOQUE: Tierra (32)</button>
+    <button class="worldbtn" id="mineButton" type="button">MINAR · E</button>
+    <button class="worldbtn" id="placeButton" type="button">COLOCAR · Q</button>
+  </div>
   <div class="bottom"><div class="pill">CUCHILLO · 20 DAÑO</div><button class="pill knifeHit" id="knifeHit" type="button">ATACAR</button></div>
 </div>
-<div id="touch"><div class="stick left" id="moveStick"><div class="knob" id="moveKnob"></div></div><div class="stick right" id="lookStick"><div class="knob" id="lookKnob"></div></div><button class="touchAction" id="touchAttack">ATAQUE</button><button class="touchFs" id="touchFs">⛶</button></div>
+<div id="touch"><div class="stick left" id="moveStick"><div class="knob" id="moveKnob"></div></div><div class="stick right" id="lookStick"><div class="knob" id="lookKnob"></div></div><button class="touchAction" id="touchAttack">ATAQUE</button><button class="touchFs" id="touchFs">⛶</button><div class="touchWorldActions"><button id="touchMine">MINAR</button><button id="touchPlace">COLOCAR</button><button id="touchSelect">BLOQUE</button></div></div>
 <div id="damageFlash"></div>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"}}</script>
