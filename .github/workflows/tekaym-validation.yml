@@ -226,3 +226,19 @@ jobs:
           if(!worker.includes('function randomZombieSpot()')||!worker.includes('function randomAnimalSpot(player')) throw new Error('Open-world creature spawning is missing');
           console.log('Server no longer uses prison-cell exclusions or player cell IDs');
           NODE
+
+      
+      - name: Fix multiplayer freeze and stale connection state
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          if(!main.includes('function disconnectMultiplayer()')) throw new Error('Multiplayer disconnect cleanup missing');
+          if(!main.includes('function showGameMenu(){if(gameStarted)saveWorld();gameStarted=false;disconnectMultiplayer();')) throw new Error('Returning to menu does not close the old session');
+          if(!main.includes('connected=true;spawnProceduralZombies(18)')) throw new Error('Multiplayer zombies are not initialized');
+          if(!main.includes('gameStarted=true;gameMenu.classList.add(\'hidden\')')) throw new Error('Joined multiplayer world does not activate gameplay');
+          if(!main.includes('const connection=new WebSocket(url);socket=connection;')||!main.includes('if(socket!==connection)return')) throw new Error('Stale socket events can affect a new session');
+          if(worker.includes('cell.x')||worker.includes('cell.z')) throw new Error('A stale prison-cell spawn variable would break the server');
+          console.log('Multiplayer session lifecycle and spawn checks passed');
+          NODE
