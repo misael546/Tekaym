@@ -178,7 +178,13 @@ export function createVoxelWorld(scene) {
     rebuildAt(x, z);
     return true;
   }
-  function getHeightAt(x, z) { return surfaceY(Math.floor(x), Math.floor(z)) + 1.65; }
+  function getHeightAt(x, z) {
+    const bx = Math.floor(x), bz = Math.floor(z);
+    for (let y = MAX_Y - 1; y >= 0; y--) {
+      if (getBlock(bx, y, bz)) return y + 2.65;
+    }
+    return 1.65;
+  }
   function applyChanges(saved) {
     if (!Array.isArray(saved)) return;
     for (const entry of saved) {
