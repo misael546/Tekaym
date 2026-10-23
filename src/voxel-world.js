@@ -196,14 +196,22 @@ export function createVoxelWorld(scene, seedValue=7919) {
             const dir = DIRECTIONS[face];
             if (getBlock(x + dir.n[0], y + dir.n[1], z + dir.n[2])) continue;
             const shade = face === 2 ? 1 : face === 3 ? 0.58 : (face < 2 ? 0.78 : 0.88);
-            const variation = 0.88 + hash(x + face * 17, y + id * 7, z + seed) * 0.24;
-            const c = base.clone().multiplyScalar(shade * variation);
-            for (const v of dir.v) {
-              positions.push(x + v[0], y + v[1], z + v[2]);
-              colors.push(c.r, c.g, c.b);
+            const corners = dir.v.map(v => [x + v[0], y + v[1], z + v[2]]);
+            const sample = (u, v) => [
+              corners[0][0]*(1-u)*(1-v)+corners[1][0]*u*(1-v)+corners[2][0]*u*v+corners[3][0]*(1-u)*v,
+              corners[0][1]*(1-u)*(1-v)+corners[1][1]*u*(1-v)+corners[2][1]*u*v+corners[3][1]*(1-u)*v,
+              corners[0][2]*(1-u)*(1-v)+corners[1][2]*u*(1-v)+corners[2][2]*u*v+corners[3][2]*(1-u)*v
+            ];
+            // Four tiny color tiles per face give the terrain a crisp pixel-art texture.
+            for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+              const u0=px/2,u1=(px+1)/2,v0=py/2,v1=(py+1)/2;
+              const tileVariation=0.78+hash(x*13+px*29+face*17,y*11+py*31+id*7,z*17+seed)*0.42;
+              const c=base.clone().multiplyScalar(shade*tileVariation);
+              for (const p of [sample(u0,v0),sample(u1,v0),sample(u1,v1),sample(u0,v1)]) {
+                positions.push(p[0],p[1],p[2]); colors.push(c.r,c.g,c.b);
+              }
+              indices.push(vertex,vertex+1,vertex+2,vertex,vertex+2,vertex+3); vertex+=4;
             }
-            indices.push(vertex, vertex + 1, vertex + 2, vertex, vertex + 2, vertex + 3);
-            vertex += 4;
           }
         }
       }
