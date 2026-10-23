@@ -39,10 +39,10 @@ Juego de supervivencia 3D en primera persona con mundo cúbico, construcción po
 
 - El objetivo es que el jugador cree un mundo personal y comparta un código de invitación.
 - En el modelo A, los amigos solo podrán entrar mientras el anfitrión tenga el juego abierto.
-- La conexión móvil normalmente requiere un servicio de señalización/relay o un servidor accesible; no se debe asumir que el teléfono puede aceptar conexiones entrantes.
-- El servidor debe validar movimiento, bloques colocados/rotos, inventario y daño.
-- Las modificaciones del mundo deben sincronizarse y guardarse remotamente antes de considerar esta función terminada.
-- Estado actual: la URL del Worker aún es un placeholder y la edición de bloques solo se guarda localmente. Invitaciones y mundos compartidos aún no están implementados.
+- La conexión móvil se hace a través del Worker/Durable Objects; no se depende de conexiones entrantes directas al teléfono.
+- La rama de desarrollo añade códigos de mundo, una comprobación de presencia del anfitrión y sincronización/guardado de bloques por sala.
+- El servidor debe endurecerse para validar inventario, altura/alcance de construcción, movimiento y daño antes de una prueba pública.
+- Estado actual: las rutas de sala y los mensajes de sincronización están implementados en la rama, pero la URL del Worker sigue siendo un placeholder. Falta desplegar y probar con dos cuentas/dispositivos antes de considerar las invitaciones terminadas.
 
 ## Seguridad y aislamiento
 
