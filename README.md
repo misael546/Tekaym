@@ -1,8 +1,8 @@
 # Tekaym Online
 
-Juego de supervivencia 3D en primera persona, en transición desde el prototipo de prisión hacia un mundo cúbico construible. Proyecto independiente de NeonCore y DarkPixel Online.
+Juego de supervivencia 3D en primera persona con mundo cúbico procedural, construcción por bloques, recolección, fabricación, criaturas y supervivencia. Esta es la base principal única de Tekaym Online; el antiguo mapa de prisión fue retirado. Proyecto independiente de NeonCore y DarkPixel Online.
 
-## Base cúbica integrada en la rama de desarrollo
+## Juego principal
 
 - Terreno procedural de bloques: pasto, tierra, piedra, arena, madera y hojas.
 - Chunks dinámicos de 16×16 bloques: el terreno se genera al explorar, con distancia de render adaptable para móvil y PC.
@@ -28,9 +28,9 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 ### PC
 - WASD: moverse; Shift: correr y gastar resistencia.
 - Mouse: mirar.
-- Clic izquierdo: minar.
+- Clic izquierdo: minar; clic derecho: colocar bloque.
 - Clic derecho: colocar el bloque seleccionado.
-- E: minar; Q: colocar; R: cambiar bloque.
+- E: abrir inventario; Q: colocar bloque; R: cambiar espacio de la barra rápida; F: comer.
 - Espacio o botón ATACAR: atacar.
 
 ### Android / pantalla táctil
@@ -48,7 +48,7 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 - Mejoras de IA, animaciones, herramientas y recetas.
 - Empaquetado y pruebas de una APK Android.
 
-La rama de desarrollo ya contiene rutas para crear salas, entrar con código y sincronizar cambios de bloques mediante Durable Objects. Sin embargo, la URL del Worker sigue pendiente de configurar en `src/config.js`, por lo que el multijugador no se puede probar desde el cliente publicado todavía. El guardado local funciona como respaldo; la sincronización remota requiere despliegue y pruebas.
+El proyecto contiene rutas para crear salas, entrar con código y sincronizar cambios de bloques mediante Durable Objects. Sin embargo, la URL del Worker sigue pendiente de configurar en `src/config.js`, por lo que el multijugador no se puede probar desde el cliente publicado todavía. El guardado local funciona como respaldo; la sincronización remota requiere despliegue y pruebas.
 
 ## Arquitectura existente
 
