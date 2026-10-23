@@ -23,9 +23,9 @@ const voxelWorld=createVoxelWorld(scene);
 const spawn=voxelWorld.spawn;
 zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
-const inventory={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
+const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,sword:0,stoneSword:0,craftingTable:0,furnace:0};
 let selectedBlock=BLOCK.DIRT;
-try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
+try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 controls.object.position.copy(voxelWorld.spawn);
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
@@ -66,8 +66,8 @@ function canOccupy(x,z,eyeY){
  return true;
 }
 function moveLocal(dt){
- const speed=player.stamina<15?2.1:4.2,v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=1000000;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-10*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
+ const sprinting=keys.shift&&player.stamina>1;const speed=player.stamina<1?2.1:(sprinting?7.2:4.2),v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
+ if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=1000000;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
  const cx=Math.floor(controls.object.position.x/16),cz=Math.floor(controls.object.position.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(controls.object.position)}
 }
 function updateNeeds(dt){
@@ -82,57 +82,64 @@ function saveWorld(){
 function loadRoomInventory(){
  try{
   const saved=JSON.parse(localStorage.getItem(roomSaveKey())||'null');
-  const defaults={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
+  const defaults={};
   for(const id of Object.keys(inventory))inventory[id]=saved?.inventory&&id in saved.inventory?Math.max(0,Math.min(9999,Number(saved.inventory[id])||0)):defaults[id]||0;
   selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;
  }catch(e){console.warn('[TEKAYM] No se pudo cargar el inventario del mundo',e)}
  updateInventoryHud();
 }
 function updateInventoryHud(){
- if(inventoryText)inventoryText.textContent='PASTO '+(inventory[BLOCK.GRASS]||0)+' · TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · ARENA '+(inventory[BLOCK.SAND]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0)+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks+' · PICOS '+inventory.pickaxe+' · HACHAS '+inventory.axe;
+ if(inventoryText)inventoryText.textContent='TRONCOS '+inventory[BLOCK.WOOD]+' · PIEDRA '+inventory[BLOCK.STONE]+' · CARBÓN '+inventory.coal+' · HIERRO '+inventory[BLOCK.IRON_ORE]+' · LINGOTES '+inventory.ironIngot+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks+' · PICO MADERA '+inventory.pickaxe+' · PICO PIEDRA '+inventory.stonePickaxe+' · PICO HIERRO '+inventory.ironPickaxe;
  if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
 }
 function mineBlock(){
  if(player.dead)return;
- const hit=voxelWorld.targetFromCamera(camera);
- if(!hit)return;
- const id=voxelWorld.breakBlock(camera);
- if(!id)return;
- inventory[id]=(inventory[id]||0)+((id===BLOCK.STONE&&inventory.pickaxe>0)||(id===BLOCK.WOOD&&inventory.axe>0)?2:1);
+ const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
+ const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
+ const toolNeeded= id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
+ if(toolNeeded&&!inventory[toolNeeded]){hint.textContent=toolNeeded==='pickaxe'?'Necesitas un pico de madera para picar piedra y carbón.':toolNeeded==='stonePickaxe'?'Necesitas un pico de piedra para extraer hierro.':'Necesitas un pico de hierro para extraer oro y diamante.';return;}
+ const removed=voxelWorld.breakBlock(camera);if(!removed)return;
+ const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:'planks',[BLOCK.CRAFTING_TABLE]:'craftingTable',[BLOCK.FURNACE]:'furnace' };
+ const drop=drops[removed];if(drop!==undefined)inventory[drop]=(inventory[drop]||0)+1;
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  updateInventoryHud();saveWorld();
 }
 function placeSelectedBlock(){
  if(player.dead)return;if((inventory[selectedBlock]||0)<1){hint.textContent='No tienes '+voxelWorld.blockName(selectedBlock)+' para colocar.';return;}
- const hit=voxelWorld.targetFromCamera(camera);
- if(!hit)return;
+ const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
  const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;
  if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position)){
-  inventory[selectedBlock]--;
-  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x,y,z,id:selectedBlock}));
+  inventory[selectedBlock]--;if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x,y,z,id:selectedBlock}));
   updateInventoryHud();saveWorld();
  }
 }
 function selectNextBlock(){
- const ids=[BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.SAND,BLOCK.GRASS];
+ const ids=[BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.SAND,BLOCK.GRASS,BLOCK.PLANKS,BLOCK.CRAFTING_TABLE,BLOCK.FURNACE];
  const at=Math.max(0,ids.indexOf(selectedBlock));selectedBlock=ids[(at+1)%ids.length];updateInventoryHud();saveWorld();
 }
 function craftPlanks(){
- if(inventory[BLOCK.WOOD]<1){hint.textContent='Necesitas 1 bloque de madera para fabricar 4 tablas.';return;}
+ if(inventory[BLOCK.WOOD]<1){hint.textContent='Tala un árbol y consigue un tronco primero.';return;}
  inventory[BLOCK.WOOD]--;inventory.planks+=4;hint.textContent='Fabricaste 4 tablas.';updateInventoryHud();saveWorld();
 }
 function craftSticks(){
  if(inventory.planks<2){hint.textContent='Necesitas 2 tablas para fabricar 4 palos.';return;}
  inventory.planks-=2;inventory.sticks+=4;hint.textContent='Fabricaste 4 palos.';updateInventoryHud();saveWorld();
 }
-function craftPickaxe(){
- if(inventory.planks<3||inventory.sticks<2){hint.textContent='Pico: necesitas 3 tablas y 2 palos.';return;}
- inventory.planks-=3;inventory.sticks-=2;inventory.pickaxe++;hint.textContent='Fabricaste un pico: ahora obtienes más piedra.';updateInventoryHud();saveWorld();
+function craftRecipe(cost,result,amount=1,label='Objeto'){
+ for(const [item,n] of Object.entries(cost))if((inventory[item]||0)<n){hint.textContent=label+': te faltan recursos ('+n+' de '+item+').';return false;}
+ for(const [item,n] of Object.entries(cost))inventory[item]-=n;
+ inventory[result]=(inventory[result]||0)+amount;hint.textContent='Fabricaste: '+label;updateInventoryHud();saveWorld();return true;
 }
-function craftAxe(){
- if(inventory.planks<3||inventory.sticks<2){hint.textContent='Hacha: necesitas 3 tablas y 2 palos.';return;}
- inventory.planks-=3;inventory.sticks-=2;inventory.axe++;hint.textContent='Fabricaste un hacha: ahora obtienes más madera y haces más daño local.';updateInventoryHud();saveWorld();
-}
+function craftPickaxe(){craftRecipe({planks:3,sticks:2},'pickaxe',1,'Pico de madera');}
+function craftAxe(){craftRecipe({planks:3,sticks:2},'axe',1,'Hacha de madera');}
+function craftShovel(){craftRecipe({planks:1,sticks:2},'shovel',1,'Pala de madera');}
+function craftSword(){craftRecipe({planks:2,sticks:1},'sword',1,'Espada de madera');}
+function craftTable(){craftRecipe({planks:4},'craftingTable',1,'Mesa de trabajo');}
+function craftStonePickaxe(){craftRecipe({3:3,sticks:2},'stonePickaxe',1,'Pico de piedra');}
+function craftStoneAxe(){craftRecipe({3:3,sticks:2},'stoneAxe',1,'Hacha de piedra');}
+function craftStoneSword(){craftRecipe({3:2,sticks:1},'stoneSword',1,'Espada de piedra');}
+function craftIronPickaxe(){craftRecipe({ironIngot:3,sticks:2},'ironPickaxe',1,'Pico de hierro');}
+function smeltIron(){if(!inventory.furnace){hint.textContent='Primero fabrica un horno con 8 piedras.';return;}if(!inventory[BLOCK.IRON_ORE]||!inventory.coal){hint.textContent='Fundir hierro requiere mineral de hierro y carbón.';return;}inventory[BLOCK.IRON_ORE]--;inventory.coal--;inventory.ironIngot++;hint.textContent='Fundiste 1 lingote de hierro.';updateInventoryHud();saveWorld();}
 function attack(){
  if(player.dead||player.cooldown>0)return;
  player.cooldown=.55;if(knife)knife.rotation.z-=.8;
@@ -142,7 +149,7 @@ function attack(){
  if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
  else if(!connected&&best){best.userData.hp-=inventory.axe>0?30:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
-function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(v&&e.code==='Space')attack()}
+function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
 addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();});
@@ -155,7 +162,7 @@ $('copyRoomButton')?.addEventListener('click',async()=>{try{await navigator.clip
 $('craftPlanks')?.addEventListener('click',craftPlanks);
 $('craftSticks')?.addEventListener('click',craftSticks);
 $('craftPickaxe')?.addEventListener('click',craftPickaxe);
-$('craftAxe')?.addEventListener('click',craftAxe);
+$('craftAxe')?.addEventListener('click',craftAxe);$('craftShovel')?.addEventListener('click',craftShovel);$('craftSword')?.addEventListener('click',craftSword);$('craftTable')?.addEventListener('click',craftTable);$('craftStonePickaxe')?.addEventListener('click',craftStonePickaxe);$('craftStoneAxe')?.addEventListener('click',craftStoneAxe);$('craftStoneSword')?.addEventListener('click',craftStoneSword);$('craftIronPickaxe')?.addEventListener('click',craftIronPickaxe);$('craftFurnace')?.addEventListener('click',()=>craftRecipe({3:8},'furnace',1,'Horno'));$('smeltIron')?.addEventListener('click',smeltIron);
 selectedText?.addEventListener('click',selectNextBlock);
 addEventListener('beforeunload',saveWorld);
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
