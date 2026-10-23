@@ -26,7 +26,7 @@ Juego de supervivencia 3D en primera persona con mundo cúbico procedural, const
 ## Controles
 
 ### PC
-- WASD: moverse; Shift: correr y gastar resistencia.
+- WASD: moverse; Espacio: saltar; Shift: correr y gastar resistencia.
 - Mouse: mirar.
 - Clic izquierdo: minar; clic derecho: colocar bloque.
 - Clic derecho: colocar el bloque seleccionado.
@@ -34,7 +34,7 @@ Juego de supervivencia 3D en primera persona con mundo cúbico procedural, const
 - Espacio o botón ATACAR: atacar.
 
 ### Android / pantalla táctil
-- Joystick izquierdo: moverse; botón CORRER: sprint.
+- Joystick izquierdo: moverse; botón SALTAR: saltar; botón CORRER: sprint.
 - Joystick derecho: mirar.
 - Botones MINAR, COLOCAR, BLOQUE y ATAQUE.
 - El panel de inventario y fabricación se puede desplazar.
