@@ -32,11 +32,9 @@ jobs:
         run: |
           cp src/main.js /tmp/tekaym-main.mjs
           cp src/config.js /tmp/tekaym-config.mjs
-          cp src/prison.js /tmp/tekaym-prison.mjs
           cp src/voxel-world.js /tmp/tekaym-voxel-world.mjs
           node --check /tmp/tekaym-main.mjs
           node --check /tmp/tekaym-config.mjs
-          node --check /tmp/tekaym-prison.mjs
           node --check /tmp/tekaym-voxel-world.mjs
       - name: Check client structure
         run: |
@@ -44,7 +42,6 @@ jobs:
           test -f release.json
           test -f src/main.js
           test -f src/config.js
-          test -f src/prison.js
           test -f src/voxel-world.js
           test -f worker/src/index.js
           test -f worker/wrangler.jsonc
@@ -192,7 +189,7 @@ jobs:
           if(!m.includes('function beginLocalWorld(isNew)')||!h.includes('id="newLocalWorldButton"'))throw new Error('World menu missing');
           if(!m.includes('RECIPES.filter(canCraftRecipe)'))throw new Error('Material-filtered recipes missing');
           if(!m.includes('function renderHotbar()')||!h.includes('id="hotbar"'))throw new Error('Hotbar missing');
-          if(!m.includes('knife=null')||m.includes('try{const g=await loadModel(ASSETS.knife)'))throw new Error('Knife still equipped');
+          if(!m.includes('MANOS VACÍAS'))throw new Error('Empty-hand start is missing');
           if(!m.includes("e.code.startsWith('Digit')")||!m.includes("e.code==='KeyE'"))throw new Error('Inventory/hotbar keyboard controls missing');
           if(!v.includes('createVoxelWorld(scene, seedValue=7919)'))throw new Error('World seeds missing');
           if(!h.includes('id="inventoryModal"')||!h.includes('id="recipeList"'))throw new Error('Inventory UI missing');
