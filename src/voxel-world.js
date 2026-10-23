@@ -271,7 +271,7 @@ export function createVoxelWorld(scene) {
     ensureChunkData(chunkOf(x), chunkOf(z));
     const bx = Math.floor(x), bz = Math.floor(z);
     const naturalTop = surfaceY(bx, bz);
-    for (let y = Math.min(MAX_Y - 1, naturalTop + 1); y >= 0; y--) {
+    for (let y = Math.min(MAX_Y - 1, naturalTop); y >= 0; y--) {
       if (getBlock(bx, y, bz)) return y + 2.65;
     }
     return 1.65;
