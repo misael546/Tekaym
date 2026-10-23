@@ -20,11 +20,12 @@ const light=new THREE.DirectionalLight(0xc8d5e2,1.15);light.position.set(22,30,1
 
 const voxelWorld=createVoxelWorld(scene);
 const spawn=voxelWorld.spawn;
-controls.object.position.copy(spawn);zoneText.textContent='MUNDO CÚBICO';
+zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
 const inventory={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
 let selectedBlock=BLOCK.DIRT;
 try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1')||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
+controls.object.position.copy(voxelWorld.spawn);
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
 const zombies=[],remotePlayers=new Map();
 const keys={w:false,a:false,s:false,d:false};
@@ -54,9 +55,18 @@ function randomZombiePosition(){
 function spawnProceduralZombies(count){
  for(let i=0;i<count;i++){const z=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,5,8),new THREE.MeshStandardMaterial({color:0x77706b,roughness:.9}));body.position.y=.8;z.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),new THREE.MeshStandardMaterial({color:0x8d8882,roughness:.9}));head.position.y=1.55;z.add(head);z.position.copy(randomZombiePosition());z.userData={id:'z'+i,hp:45,speed:1.05+Math.random()*.5,phase:Math.random()*6.28};scene.add(z);zombies.push(z)}
 }
+function canOccupy(x,z,eyeY){
+ const footY=eyeY-1.65;
+ for(const px of [x-.28,x+.28])for(const pz of [z-.28,z+.28]){
+  for(let y=Math.floor(footY+.1);y<=Math.floor(eyeY+.15);y++){
+   if(voxelWorld.getBlock(Math.floor(px),y,Math.floor(pz)))return false;
+  }
+ }
+ return true;
+}
 function moveLocal(dt){
  const speed=player.stamina<15?2.1:4.2,v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=62;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-10*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
+ if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=62;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-10*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
 }
 function updateNeeds(dt){
  player.hunger=Math.max(0,player.hunger-.18*dt);player.thirst=Math.max(0,player.thirst-.26*dt);
