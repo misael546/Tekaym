@@ -99,7 +99,7 @@ function mineBlock(){
  const toolNeeded= id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
  if(toolNeeded&&!inventory[toolNeeded]){hint.textContent=toolNeeded==='pickaxe'?'Necesitas un pico de madera para picar piedra y carbón.':toolNeeded==='stonePickaxe'?'Necesitas un pico de piedra para extraer hierro.':'Necesitas un pico de hierro para extraer oro y diamante.';return;}
  const removed=voxelWorld.breakBlock(camera);if(!removed)return;
- const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:'craftingTable',[BLOCK.FURNACE]:'furnace' };
+ const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE };
  const drop=drops[removed];if(drop!==undefined)inventory[drop]=(inventory[drop]||0)+1;
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  updateInventoryHud();saveWorld();
@@ -146,7 +146,7 @@ function attack(){
  const origin=controls.object.position.clone(),forward=new THREE.Vector3();camera.getWorldDirection(forward);
  let best=null,bestD=2.25;
  for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
- if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
+ if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id,weapon:inventory.stoneSword?'stoneSword':inventory.sword?'sword':inventory.axe?'axe':'knife'}));
  else if(!connected&&best){best.userData.hp-=inventory.stoneSword>0?45:inventory.sword>0?30:inventory.axe>0?28:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
