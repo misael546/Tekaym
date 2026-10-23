@@ -42,6 +42,7 @@ export function createVoxelWorld(scene) {
   const chunks = new Map();
   const materials = new Map();
   const changes = new Map();
+  const originals = new Map();
   const raycaster = new THREE.Raycaster();
   raycaster.far = 6;
   const center = new THREE.Vector3();
@@ -163,8 +164,10 @@ export function createVoxelWorld(scene) {
     if (!hit) return false;
     const id = getBlock(hit.x, hit.y, hit.z);
     if (!id || hit.y <= 0) return false;
+    const k = key(hit.x, hit.y, hit.z);
+    if (!changes.has(k)) originals.set(k, getBlock(hit.x, hit.y, hit.z));
     putRaw(hit.x, hit.y, hit.z, BLOCK.AIR);
-    changes.set(key(hit.x, hit.y, hit.z), BLOCK.AIR);
+    changes.set(k, BLOCK.AIR);
     rebuildAt(hit.x, hit.z);
     return id;
   }
@@ -174,8 +177,10 @@ export function createVoxelWorld(scene) {
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
     if (x < -HALF_WORLD || x >= HALF_WORLD || z < -HALF_WORLD || z >= HALF_WORLD || getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
     if (playerPosition && Math.abs(x + 0.5 - playerPosition.x) < 0.8 && Math.abs(z + 0.5 - playerPosition.z) < 0.8 && y < playerPosition.y + 1.8 && y + 1 > playerPosition.y - 1.8) return false;
+    const k = key(x, y, z);
+    if (!changes.has(k)) originals.set(k, getBlock(x, y, z));
     putRaw(x, y, z, id);
-    changes.set(key(x, y, z), id);
+    changes.set(k, id);
     rebuildAt(x, z);
     return true;
   }
@@ -193,8 +198,10 @@ export function createVoxelWorld(scene) {
       if (entry.x < -HALF_WORLD || entry.x >= HALF_WORLD || entry.z < -HALF_WORLD || entry.z >= HALF_WORLD || entry.y < 0 || entry.y >= MAX_Y) continue;
       const id = Number(entry.id);
       if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.LEAVES) continue;
+      const k = key(entry.x, entry.y, entry.z);
+      if (!changes.has(k)) originals.set(k, getBlock(entry.x, entry.y, entry.z));
       putRaw(entry.x, entry.y, entry.z, id);
-      changes.set(key(entry.x, entry.y, entry.z), id);
+      changes.set(k, id);
     }
     const touched = new Set();
     for (const entry of saved) {
@@ -209,6 +216,17 @@ export function createVoxelWorld(scene) {
     for (const ck of touched) {
       const [cx, cz] = ck.split(',').map(Number);
       if (chunks.has(ck)) buildChunk(cx, cz);
+    }
+  }
+  function resetChanges() {
+    for (const [k, id] of originals) {
+      const [x, y, z] = k.split(',').map(Number);
+      putRaw(x, y, z, id);
+    }
+    changes.clear();
+    originals.clear();
+    for (let cx = -WORLD_CHUNKS / 2; cx < WORLD_CHUNKS / 2; cx++) {
+      for (let cz = -WORLD_CHUNKS / 2; cz < WORLD_CHUNKS / 2; cz++) buildChunk(cx, cz);
     }
   }
   function serializeChanges() {
@@ -228,7 +246,7 @@ export function createVoxelWorld(scene) {
 
   return {
     group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
-    applyChanges, serializeChanges, blockName,
+    applyChanges, resetChanges, serializeChanges, blockName,
     get spawn() { return new THREE.Vector3(0.5, getHeightAt(0, 0), 0.5); },
     dispose
   };
