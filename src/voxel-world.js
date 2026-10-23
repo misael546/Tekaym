@@ -2,15 +2,22 @@ import * as THREE from 'three';
 
 const CHUNK_SIZE = 16;
 const RENDER_DISTANCE = typeof window !== 'undefined' && window.innerWidth <= 800 ? 2 : 3;
-const MAX_Y = 28;
-const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6 });
+const MAX_Y = 48;
+const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6, COAL_ORE: 7, IRON_ORE: 8, GOLD_ORE: 9, DIAMOND_ORE: 10, PLANKS: 11, CRAFTING_TABLE: 12, FURNACE: 13 });
 const COLORS = {
   [BLOCK.GRASS]: new THREE.Color(0x609447),
   [BLOCK.DIRT]: new THREE.Color(0x79553a),
   [BLOCK.STONE]: new THREE.Color(0x777c80),
   [BLOCK.SAND]: new THREE.Color(0xc8b77a),
   [BLOCK.WOOD]: new THREE.Color(0x79502e),
-  [BLOCK.LEAVES]: new THREE.Color(0x3e713b)
+  [BLOCK.LEAVES]: new THREE.Color(0x3e713b),
+  [BLOCK.COAL_ORE]: new THREE.Color(0x34383d),
+  [BLOCK.IRON_ORE]: new THREE.Color(0xb98f78),
+  [BLOCK.GOLD_ORE]: new THREE.Color(0xe3bd36),
+  [BLOCK.DIAMOND_ORE]: new THREE.Color(0x45d9d2),
+  [BLOCK.PLANKS]: new THREE.Color(0xb98a52),
+  [BLOCK.CRAFTING_TABLE]: new THREE.Color(0x8b5b32),
+  [BLOCK.FURNACE]: new THREE.Color(0x55565a)
 };
 const DIRECTIONS = [
   { n: [1, 0, 0], v: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
@@ -59,8 +66,6 @@ export function createVoxelWorld(scene) {
     if (id === BLOCK.AIR) blocks.delete(k);
     else blocks.set(k, id);
   }
-  function surfaceY(x, z) { return terrainHeight(x, z); }
-
   function chunkOf(v) { return Math.floor(v / CHUNK_SIZE); }
   function surfaceY(x, z) { return terrainHeight(x, z); }
   function ensureChunkData(cx, cz) {
@@ -72,7 +77,14 @@ export function createVoxelWorld(scene) {
       for (let z = startZ; z < startZ + CHUNK_SIZE; z++) {
         const top = surfaceY(x, z);
         for (let y = 0; y <= top; y++) {
-          const id = y === top ? (top <= 4 ? BLOCK.SAND : BLOCK.GRASS) : y >= top - 3 ? BLOCK.DIRT : BLOCK.STONE;
+          let id = y === top ? (top <= 4 ? BLOCK.SAND : BLOCK.GRASS) : y >= top - 3 ? BLOCK.DIRT : BLOCK.STONE;
+          if (y > 1 && y < top - 3) {
+            const ore = hash(x * 31 + y * 7, z * 29 - y * 11, seed + y * 101);
+            if (y < 8 && ore > 0.997) id = BLOCK.DIAMOND_ORE;
+            else if (y < 13 && ore > 0.992) id = BLOCK.GOLD_ORE;
+            else if (y < 20 && ore > 0.965) id = BLOCK.IRON_ORE;
+            else if (ore > 0.925) id = BLOCK.COAL_ORE;
+          }
           putRaw(x, y, z, id);
         }
       }
@@ -228,6 +240,21 @@ export function createVoxelWorld(scene) {
     rebuildAt(x, z);
     return true;
   }
+  function isSolid(id) { return id !== BLOCK.AIR; }
+  function isSafeSpawn(x = 0, z = 0) {
+    ensureChunkData(chunkOf(x), chunkOf(z));
+    const bx = Math.floor(x), bz = Math.floor(z);
+    let top = 0;
+    for (let y = MAX_Y - 1; y >= 0; y--) if (isSolid(getBlock(bx, y, bz))) { top = y; break; }
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      ensureChunkData(chunkOf(bx + dx), chunkOf(bz + dz));
+      for (let y = top + 1; y <= top + 3; y++) {
+        const k = key(bx + dx, y, bz + dz);
+        if (getBlock(bx + dx, y, bz + dz)) { changes.set(k, BLOCK.AIR); putRaw(bx + dx, y, bz + dz, BLOCK.AIR); }
+      }
+    }
+    return new THREE.Vector3(x + 0.5, top + 2.65, z + 0.5);
+  }
   function getHeightAt(x, z) {
     ensureChunkData(chunkOf(x), chunkOf(z));
     const bx = Math.floor(x), bz = Math.floor(z);
@@ -243,7 +270,7 @@ export function createVoxelWorld(scene) {
       if (entry.y < 0 || entry.y >= MAX_Y) continue;
       ensureChunkData(chunkOf(entry.x), chunkOf(entry.z));
       const id = Number(entry.id);
-      if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.LEAVES) continue;
+      if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.FURNACE) continue;
       const k = key(entry.x, entry.y, entry.z);
       if (!changes.has(k)) originals.set(k, getBlock(entry.x, entry.y, entry.z));
       putRaw(entry.x, entry.y, entry.z, id);
@@ -282,7 +309,7 @@ export function createVoxelWorld(scene) {
     });
   }
   function blockName(id) {
-    return ({1:'Pasto',2:'Tierra',3:'Piedra',4:'Arena',5:'Madera',6:'Hojas'})[id] || 'Bloque';
+    return ({1:'Pasto',2:'Tierra',3:'Piedra',4:'Arena',5:'Madera',6:'Hojas',7:'Mineral de carbón',8:'Mineral de hierro',9:'Mineral de oro',10:'Mineral de diamante',11:'Tablas',12:'Mesa de trabajo',13:'Horno'})[id] || 'Bloque';
   }
   function dispose() {
     for (const mesh of chunks.values()) mesh.geometry.dispose();
@@ -293,7 +320,8 @@ export function createVoxelWorld(scene) {
   return {
     group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
     applyChanges, resetChanges, serializeChanges, blockName, updateStreaming,
-    get spawn() { return new THREE.Vector3(0.5, getHeightAt(0, 0), 0.5); },
+    safeSpawn: isSafeSpawn,
+    get spawn() { return isSafeSpawn(0, 0); },
     dispose
   };
 }
