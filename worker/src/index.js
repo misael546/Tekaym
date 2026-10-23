@@ -451,6 +451,7 @@ export class GameRoom extends DurableObject {
         const nextZ = clamp(p.z + dz * ratio, WORLD.minZ, WORLD.maxZ);
         p.x = nextX; p.z = nextZ; p.lastMove = now;
         this.moveZombies(elapsed);
+        this.moveAnimals(elapsed);
         this.persistSession(ws, p);
         this.broadcastState();
       }
