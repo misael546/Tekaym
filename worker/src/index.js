@@ -543,7 +543,8 @@ export class GameRoom extends DurableObject {
   async alarm() {
     await this.load();
     const now = Date.now();
-    const elapsed = clamp((now - this.lastWorldTick) / 1000, 0, 5);
+    const realElapsed = clamp((now - this.lastWorldTick) / 1000, 0, 30);
+    const elapsed = clamp(realElapsed, 0, 5);
     this.lastWorldTick = now;
     for (const p of this.sessions.values()) {
       this.updateNeeds(p, now);
@@ -554,8 +555,8 @@ export class GameRoom extends DurableObject {
       if (p.ws) this.persistSession(p.ws, p);
     }
     this.moveZombies(elapsed || 1);
-    this.worldClock = (this.worldClock + (elapsed || 1)) % 1200;
-    this.moveAnimals(elapsed || 1);
+    this.worldClock = (this.worldClock + (realElapsed || 1)) % 1200;
+    this.moveAnimals(realElapsed || 1);
     await this.ctx.storage.put('worldClock', this.worldClock);
     await this.ctx.storage.put('zombies', this.zombies);
     await this.ctx.storage.put('animals', this.animals);
