@@ -426,6 +426,13 @@ export class GameRoom extends DurableObject {
 
   async webSocketError(ws) {
     const p = this.refreshSession(ws);
+    if (p && p.googleSub && p.googleSub === this.roomOwnerSub) {
+      for (const other of [...this.sessions.values()]) {
+        if (other.id === p.id) continue;
+        this.sessions.delete(other.id);
+        try { other.ws.close(1001, 'El anfitrión perdió la conexión'); } catch {}
+      }
+    }
     if (p) this.sessions.delete(p.id);
     this.broadcastState();
   }
