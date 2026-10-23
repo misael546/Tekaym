@@ -5,7 +5,9 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 ## Base cúbica integrada en la rama de desarrollo
 
 - Terreno procedural de bloques: pasto, tierra, piedra, arena, madera y hojas.
-- Chunks para agrupar la geometría y dibujar solo las caras visibles.
+- Chunks dinámicos de 16×16 bloques: el terreno se genera al explorar, con distancia de render adaptable para móvil y PC.
+- Descarga de geometría y datos base de chunks lejanos; las modificaciones se conservan y reaplican al volver.
+- Mundo procedural sin borde fijo práctico; el servidor mantiene un límite de seguridad amplio.
 - Romper y colocar bloques con controles de PC y botones táctiles.
 - Inventario inicial de recursos y selección de bloque para construir.
 - Recetas iniciales: madera a tablas, tablas a palos, pico y hacha.
@@ -34,6 +36,7 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 - Pruebas y endurecimiento de la sincronización de bloques por mundo.
 - Probar la creación de mundos con códigos de invitación y el cierre cuando el anfitrión se desconecta.
 - Verificar el guardado remoto del mundo y el acceso de amigos.
+- Verificación visual de carga y descarga de chunks en navegador y móvil.
 - Mejoras de IA, animaciones, herramientas y recetas.
 - Empaquetado y pruebas de una APK Android.
 
