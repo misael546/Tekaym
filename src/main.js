@@ -139,7 +139,7 @@ function canOccupy(x,z,eyeY){
 }
 function moveLocal(dt){
  const sprinting=keys.shift&&player.stamina>1;const speed=player.stamina<1?2.1:(sprinting?7.2:4.2),v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const yaw=camera.rotation.y;const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=99900;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){if(player.grounded)next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else player.stamina=Math.min(100,player.stamina+22*dt);
+ if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=99900;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){if(player.grounded)next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else player.stamina=Math.min(100,player.stamina+22*dt);
  const pos=controls.object.position,groundY=voxelWorld.getHeightAt(pos.x,pos.z);
  if(player.grounded){pos.y=groundY;player.jumpVelocity=0}
  else{const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
