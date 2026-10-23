@@ -181,6 +181,7 @@ export class GameRoom extends DurableObject {
     this.roomOwnerSub = '';
     this.initialized = false;
     this.lastWorldTick = Date.now();
+    this.worldClock = 0;
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment();
       if (attachment && attachment.id) this.sessions.set(attachment.id, { ...attachment, ws });
@@ -191,6 +192,8 @@ export class GameRoom extends DurableObject {
     if (this.initialized) return;
     this.initialized = true;
     this.zombies = await this.ctx.storage.get('zombies');
+    const savedWorldClock = await this.ctx.storage.get('worldClock');
+    this.worldClock = Number.isFinite(Number(savedWorldClock)) ? ((Number(savedWorldClock) % 1200) + 1200) % 1200 : 0;
     this.roomOwnerSub = String(await this.ctx.storage.get('roomOwnerSub') || '');
     const savedBlocks = await this.ctx.storage.get('blocks');
     if (Array.isArray(savedBlocks)) {
@@ -302,6 +305,7 @@ export class GameRoom extends DurableObject {
   statePayload() {
     return {
       type: 'state',
+      worldClock: this.worldClock,
       players: [...this.sessions.values()].filter(p => p.joined).map(p => ({
         id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp,
         stamina: p.stamina, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId
@@ -321,7 +325,7 @@ export class GameRoom extends DurableObject {
     try { msg = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); } catch { return; }
 
     if (msg.type === 'join') {
-      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, blocks: [...this.blocks.values()] }); return; }
+      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, blocks: [...this.blocks.values()], worldClock: this.worldClock }); return; }
       try {
         const google = await verifyGoogle(String(msg.googleIdToken || ''), this.env);
         if (this.roomOwnerSub && google.sub !== this.roomOwnerSub && ![...this.sessions.values()].some(s => s.joined && s.googleSub === this.roomOwnerSub)) {
@@ -453,6 +457,8 @@ export class GameRoom extends DurableObject {
       if (p.ws) this.persistSession(p.ws, p);
     }
     this.moveZombies(elapsed || 1);
+    this.worldClock = (this.worldClock + (elapsed || 1)) % 1200;
+    await this.ctx.storage.put('worldClock', this.worldClock);
     await this.ctx.storage.put('zombies', this.zombies);
     if (this.sessions.size) this.broadcastState();
     await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
