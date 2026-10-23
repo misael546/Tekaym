@@ -6,6 +6,7 @@ import {createVoxelWorld} from './voxel-world.js';
 
 const $=id=>document.getElementById(id);
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
+const serverIsConfigured=!/YOUR-SUBDOMAIN|YOUR-TEKAYM/.test(SERVER_URL);
 const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginStatus=$('loginStatus'),googleButton=$('googleButton'),gameMenu=$('gameMenu'),inventoryModal=$('inventoryModal'),recipeList=$('recipeList'),inventoryGrid=$('inventoryGrid'),hotbarEl=$('hotbar'); let gameStarted=false,selectedHotbar=0,hotbarSlots=Array(9).fill(null),worldSeed=7919;
 const hpText=$('hpText'),hpFill=$('hpFill'),stamText=$('stamText'),stamFill=$('stamFill'),hungerText=$('hungerText'),hungerFill=$('hungerFill'),thirstText=$('thirstText'),thirstFill=$('thirstFill'),zoneText=$('zoneText'),hint=$('hint'),damageFlash=$('damageFlash'),knifeHit=$('knifeHit'),mineButton=$('mineButton'),placeButton=$('placeButton'),inventoryText=$('inventoryText'),selectedText=$('selectedText');
 let activeRoomCode='main';
@@ -251,7 +252,9 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){if(gameSta
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
 
 function showLogin(text){loginGate.classList.remove('hidden');loginStatus.textContent=text}
+$('loginBackButton')?.addEventListener('click',()=>{loginGate.classList.add('hidden');gameMenu.classList.remove('hidden')});
 async function createPersonalWorld(){
+ if(!serverIsConfigured){$('roomStatus').textContent='El multijugador está pendiente de configurar. Puedes jugar en el mundo local desde el menú principal.';loginStatus.textContent='Falta desplegar el servidor y configurar su URL en src/config.js.';return}
  try{
   const response=await fetch(HTTP_SERVER_URL+'/rooms/create',{cache:'no-store'});
   const data=await response.json();
@@ -272,6 +275,7 @@ function joinPersonalWorld(){
 $('createWorldButton')?.addEventListener('click',createPersonalWorld);
 $('joinWorldButton')?.addEventListener('click',joinPersonalWorld);
 async function initGoogle(){
+ if(!serverIsConfigured){showLogin('Multijugador pendiente: falta desplegar el Worker y configurar su URL en src/config.js. Pulsa VOLVER AL MENÚ para jugar localmente.');return}
  if(googleReady)return;
  try{
   const response=await fetch(HTTP_SERVER_URL+'/auth/google/config?cfg='+Date.now(),{cache:'no-store'});const cfg=await response.json();
@@ -289,7 +293,7 @@ async function onGoogleCredential(response){
 }
 function startSocket(fromLogin=false){
  const url=SERVER_URL+'?room='+encodeURIComponent(activeRoomCode||'main');
- if(url.includes('YOUR-SUBDOMAIN')||url.includes('YOUR-TEKAYM')){loginGate.classList.remove('hidden');loginStatus.textContent='El servidor de Cloudflare todavía no está conectado. El prototipo local está disponible.';boot.classList.add('hidden');hint.textContent='Configura la URL del Worker en src/config.js para activar el multijugador.';spawnProceduralZombies(18);return}
+ if(!serverIsConfigured){loginGate.classList.remove('hidden');loginStatus.textContent='El servidor de Cloudflare todavía no está conectado. El prototipo local está disponible.';boot.classList.add('hidden');hint.textContent='Configura la URL del Worker en src/config.js para activar el multijugador.';spawnProceduralZombies(18);return}
  try{
   socket=new WebSocket(url);
   socket.addEventListener('open',()=>{socket.send(JSON.stringify({type:'join',version:GAME_VERSION,googleIdToken}))});
