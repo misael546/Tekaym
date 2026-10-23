@@ -273,6 +273,7 @@ export class GameRoom extends DurableObject {
   }
 
   moveZombies(dt) {
+    if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;
     const step = clamp(dt, 0, 0.75);
     for (const zombie of this.zombies) {
       if (zombie.hp <= 0) {
@@ -282,13 +283,20 @@ export class GameRoom extends DurableObject {
         }
         continue;
       }
-      let target = null, best = 20;
+      let target = null, best = 34;
       for (const player of this.sessions.values()) {
         if (!player.joined || player.hp <= 0) continue;
         const d = Math.hypot(player.x - zombie.x, player.z - zombie.z);
         if (d < best) { best = d; target = player; }
       }
       if (!target) continue;
+      if (best > 28) {
+        const angle = Math.random() * Math.PI * 2, distance = 14 + Math.random() * 12;
+        zombie.x = clamp(target.x + Math.cos(angle) * distance, WORLD.minX, WORLD.maxX);
+        zombie.z = clamp(target.z + Math.sin(angle) * distance, WORLD.minZ, WORLD.maxZ);
+        if (isInsideCell(zombie.x, zombie.z, 0)) zombie.x = clamp(zombie.x + 8, WORLD.minX, WORLD.maxX);
+        continue;
+      }
       const dx = target.x - zombie.x, dz = target.z - zombie.z;
       const length = Math.max(0.001, Math.hypot(dx, dz));
       const distance = Math.min(zombie.speed * step, length);
