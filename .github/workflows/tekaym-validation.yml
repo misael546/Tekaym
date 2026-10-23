@@ -211,5 +211,6 @@ jobs:
           if(!main.includes('const serverIsConfigured=!/YOUR-SUBDOMAIN|YOUR-TEKAYM/.test(SERVER_URL);')) throw new Error('Multiplayer placeholder detection missing');
           if(!main.includes('if(!serverIsConfigured)')) throw new Error('Placeholder server requests are not blocked');
           if(!html.includes('id="loginBackButton"')||!main.includes("loginBackButton")||!main.includes("gameMenu.classList.remove('hidden')")) throw new Error('Login screen has no return path to local play');
-          console.log('Multiplayer placeholder and return-to-menu checks passed');
+          if(!main.includes("zoneText.textContent=activeRoomCode.startsWith('local-')?'MUNDO LOCAL':'MUNDO '+activeRoomCode")) throw new Error('Local world HUD label should be short and readable');
+          console.log('Multiplayer fallback, return-to-menu, and world HUD checks passed');
           NODE
