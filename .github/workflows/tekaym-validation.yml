@@ -66,6 +66,7 @@ jobs:
             [main.includes("navigator.clipboard.writeText(activeRoomCode)"),'Invite-code copy action missing'],
             [voxel.includes("serializeChanges")&&voxel.includes("resetChanges"),'Voxel save/reset API missing'],
             [voxel.includes("RENDER_DISTANCE")&&voxel.includes("updateStreaming"),'Dynamic chunk streaming missing'],
+            [voxel.includes("function unloadChunkData")&&voxel.includes("blocks.delete(key(x, y, z))"),'Chunk data unloading missing'],
             [main.includes("voxelWorld.updateStreaming(controls.object.position)"),'Player movement does not stream chunks'],
             [worker.includes("url.pathname === '/rooms/create'"),'Room-code creation route missing'],
             [worker.includes("msg.type === 'block_edit'"),'Server block synchronization missing'],
