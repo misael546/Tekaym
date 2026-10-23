@@ -139,6 +139,7 @@ renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 knifeHit.addEventListener('click',attack);
 mineButton?.addEventListener('click',mineBlock);
 placeButton?.addEventListener('click',placeSelectedBlock);
+$('copyRoomButton')?.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(activeRoomCode);zoneText.textContent='CÓDIGO COPIADO: '+activeRoomCode;}catch{zoneText.textContent='CÓDIGO: '+activeRoomCode;}});
 $('craftPlanks')?.addEventListener('click',craftPlanks);
 $('craftSticks')?.addEventListener('click',craftSticks);
 $('craftPickaxe')?.addEventListener('click',craftPickaxe);
