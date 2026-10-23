@@ -47,3 +47,8 @@ Juego de supervivencia 3D en primera persona con mundo cúbico, construcción po
 ## Seguridad y aislamiento
 
 Tekaym Online es independiente de NeonCore y DarkPixel Online. No reutilizar sus bases de datos, secretos, sistemas de actualización ni economía. Las credenciales deben permanecer en el backend y fuera del repositorio.
+
+
+## Ciclo de día y noche, animales y enemigos
+
+Cada mundo usa un reloj compartido de 1200 segundos (20 minutos) persistido por el Durable Object: día, atardecer, noche y amanecer. El cliente interpola el cielo, la niebla, el color e intensidad de la luz solar y la iluminación ambiental. Los zombis solo se mueven y atacan durante la franja nocturna; se reubican a una distancia jugable alrededor de jugadores activos. En la superficie, el cliente genera modelos cúbicos sencillos de pollos, cerdos y vacas cerca del jugador, que vagan y pueden cazarse. Las vacas dan carne de res cruda y posibilidad de cuero; los cerdos dan cerdo crudo; los pollos dan pollo crudo y posibilidad de plumas. La carne cruda puede consumirse para recuperar hambre. Los animales y sus recompensas todavía son locales al cliente y no se sincronizan como entidades persistentes entre jugadores.
