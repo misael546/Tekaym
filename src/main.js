@@ -251,6 +251,7 @@ function startSocket(fromLogin=false){
  }catch(e){console.error('[TEKAYM WS]',e);showLogin('No se pudo conectar con el servidor.')}
 }
 function applyState(m){
+ if(Number.isFinite(Number(m.worldClock)))worldClock=((Number(m.worldClock)%1200)+1200)%1200;
  for(const p of m.players||[]){
   if(p.id===player.id){player.hp=Number(p.hp??player.hp);player.hunger=Number(p.hunger??player.hunger);player.thirst=Number(p.thirst??player.thirst);if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}continue}
   let obj=remotePlayers.get(p.id);
