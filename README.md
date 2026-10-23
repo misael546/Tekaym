@@ -9,8 +9,12 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 - Descarga de geometría y datos base de chunks lejanos; las modificaciones se conservan y reaplican al volver.
 - Mundo procedural sin borde fijo práctico; el servidor mantiene un límite de seguridad amplio.
 - Romper y colocar bloques con controles de PC y botones táctiles.
-- Inventario inicial de recursos y selección de bloque para construir.
-- Recetas iniciales: madera a tablas, tablas a palos, pico y hacha.
+- Inventario inicial vacío: el jugador reúne recursos desde cero.
+- Progresión de supervivencia: troncos → tablas y palos → herramientas de madera → piedra y carbón → herramientas de piedra → mineral de hierro → horno, carbón y lingotes → pico de hierro.
+- Añadidos minerales de carbón, hierro, oro y diamante en distintas profundidades.
+- Recetas para pico, hacha, pala, espada, mesa de trabajo, horno y equipo de piedra/hierro.
+- Correr con Shift en PC y botón CORRER en móvil; consume resistencia.
+- Aparición sobre terreno generado con espacio libre alrededor y sin estructuras encima.
 - Colisión básica con bloques y ajuste de altura al terreno.
 - Guardado local del mundo modificado e inventario en el navegador/dispositivo.
 - Se conservan los sistemas existentes de vida, resistencia, hambre, sed y zombis.
