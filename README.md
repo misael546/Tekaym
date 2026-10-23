@@ -67,3 +67,8 @@ No guardar secretos en GitHub. No copiar archivos, bases de datos ni sistemas de
 - Fabrica palos con tablas y crea cuatro antorchas con un palo y carbón. Las antorchas iluminan casas y cuevas y protegen contra la aparición natural de zombis en su radio iluminado.
 - Los efectos de sonido y la música ambiental se sintetizan localmente con Web Audio, sin pistas de terceros.
 - El workflow Android construye un APK de depuración firmado automáticamente para pruebas; no es una firma de publicación para Google Play.
+
+
+## Menú, inventario y barra rápida
+
+El juego abre primero el menú principal; el mundo solo se inicia al elegir Crear mundo nuevo o Continuar mundo. Cada mundo nuevo usa una semilla propia. El personaje comienza sin armas ni recursos. El inventario se abre con E y solo muestra recetas cuyos materiales están disponibles. La barra rápida tiene nueve espacios seleccionables con 1–9 en PC o tocándolos en Android.

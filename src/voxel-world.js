@@ -35,13 +35,14 @@ function hash(x, z, seed = 7919) {
   n = Math.imul(n ^ (n >>> 13), 1274126177);
   return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 }
-function terrainHeight(x, z) {
-  const broad = Math.sin(x * 0.055) * 4.1 + Math.cos(z * 0.047) * 3.6;
-  const detail = Math.sin((x + z) * 0.15) * 1.25 + Math.cos((x - z) * 0.11) * 0.9;
+function terrainHeight(x, z, seed=7919) {
+  const sx=((seed>>>0)%997)/997*5, sz=((seed>>>8)%991)/991*5;
+  const broad = Math.sin((x+sx) * 0.055) * 4.1 + Math.cos((z+sz) * 0.047) * 3.6;
+  const detail = Math.sin((x + z+sx) * 0.15) * 1.25 + Math.cos((x - z+sz) * 0.11) * 0.9;
   return Math.max(4, Math.min(18, Math.floor(9 + broad + detail)));
 }
 
-export function createVoxelWorld(scene) {
+export function createVoxelWorld(scene, seedValue=7919) {
   const group = new THREE.Group();
   group.name = 'TekaymVoxelWorld';
   const blocks = new Map();
@@ -53,7 +54,7 @@ export function createVoxelWorld(scene) {
   const raycaster = new THREE.Raycaster();
   raycaster.far = 6;
   const center = new THREE.Vector3();
-  const seed = 7919;
+  const seed = Number.isFinite(Number(seedValue)) ? (Number(seedValue)>>>0) : 7919;
 
   function getBlock(x, y, z) {
     if (y < 0) return BLOCK.STONE;
@@ -68,7 +69,7 @@ export function createVoxelWorld(scene) {
     else blocks.set(k, id);
   }
   function chunkOf(v) { return Math.floor(v / CHUNK_SIZE); }
-  function surfaceY(x, z) { return terrainHeight(x, z); }
+  function surfaceY(x, z) { return terrainHeight(x, z, seed); }
   function ensureChunkData(cx, cz) {
     const ck = chunkKey(cx, cz);
     if (dataChunks.has(ck)) return;

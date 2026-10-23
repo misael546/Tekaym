@@ -57,3 +57,8 @@ Cada mundo usa un reloj compartido de 1200 segundos (20 minutos) persistido por 
 ## Supervivencia: cocina e iluminación
 
 El horno se fabrica con ocho piedras y usa carbón como combustible. Cada carbón representa ocho operaciones de cocción/fundición; cocinar una pieza tarda diez segundos. Carne cocida restaura más hambre que carne cruda. Cuatro antorchas se fabrican con carbón y un palo. Las antorchas iluminan y bloquean la aparición natural de zombis dentro de una aproximación de radio Manhattan 11, tanto en local como en multijugador. El audio ambiental y los efectos se sintetizan con Web Audio.
+
+
+## Flujo de inicio e inventario
+
+El menú principal permite crear un mundo local, continuar la última partida o abrir el flujo multijugador. Cada mundo nuevo usa una semilla propia y el personaje empieza con las manos vacías. El inventario filtra las recetas según materiales disponibles y la barra rápida de nueve espacios se puede usar en PC y móvil.

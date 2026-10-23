@@ -183,3 +183,18 @@ jobs:
           if(!fs.existsSync('capacitor.config.json')||!fs.existsSync('.github/workflows/build-android-apk.yml'))throw new Error('Android APK workflow/config missing');
           console.log('Survival systems and Android packaging checks passed');
           NODE
+
+      - name: Validate menu, movement, inventory, hotbar and bare hands
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const m=fs.readFileSync('src/main.js','utf8'); const h=fs.readFileSync('index.html','utf8'); const v=fs.readFileSync('src/voxel-world.js','utf8');
+          if(!m.includes('function setKey(e,down)'))throw new Error('Keyboard movement mapping missing');
+          if(!m.includes('function beginLocalWorld(isNew)')||!h.includes('id="newLocalWorldButton"'))throw new Error('World menu missing');
+          if(!m.includes('RECIPES.filter(canCraftRecipe)'))throw new Error('Material-filtered recipes missing');
+          if(!m.includes('function renderHotbar()')||!h.includes('id="hotbar"'))throw new Error('Hotbar missing');
+          if(!m.includes('knife=null')||m.includes('try{const g=await loadModel(ASSETS.knife)'))throw new Error('Knife still equipped');
+          if(!m.includes("e.code.startsWith('Digit')")||!m.includes("e.code==='KeyE'"))throw new Error('Inventory/hotbar keyboard controls missing');
+          if(!v.includes('createVoxelWorld(scene, seedValue=7919)'))throw new Error('World seeds missing');
+          if(!h.includes('id="inventoryModal"')||!h.includes('id="recipeList"'))throw new Error('Inventory UI missing');
+          console.log('Menu, movement, inventory, crafting, hotbar and empty-hand checks passed');
+          NODE
