@@ -200,3 +200,16 @@ jobs:
           if (!html.includes('id="zoneText"') || !main.includes("zoneText.textContent='MUNDO '+activeRoomCode")) throw new Error('Current world label is missing');
           console.log('Main world HUD labels are clean');
           NODE
+
+      
+      - name: Validate multiplayer configuration and login escape
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          if(!main.includes('const serverIsConfigured=!/YOUR-SUBDOMAIN|YOUR-TEKAYM/.test(SERVER_URL);')) throw new Error('Multiplayer placeholder detection missing');
+          if(!main.includes('if(!serverIsConfigured)')) throw new Error('Placeholder server requests are not blocked');
+          if(!html.includes('id="loginBackButton"')||!main.includes("loginBackButton")||!main.includes("gameMenu.classList.remove('hidden')")) throw new Error('Login screen has no return path to local play');
+          console.log('Multiplayer placeholder and return-to-menu checks passed');
+          NODE
