@@ -67,7 +67,7 @@ function canOccupy(x,z,eyeY){
 }
 function moveLocal(dt){
  const sprinting=keys.shift&&player.stamina>1;const speed=player.stamina<1?2.1:(sprinting?7.2:4.2),v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=1000000;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
+ if(v.lengthSq()){v.normalize();const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=99900;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else{player.stamina=Math.min(100,player.stamina+22*dt);controls.object.position.y=voxelWorld.getHeightAt(controls.object.position.x,controls.object.position.z)}
  const cx=Math.floor(controls.object.position.x/16),cz=Math.floor(controls.object.position.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(controls.object.position)}
 }
 function updateNeeds(dt){
