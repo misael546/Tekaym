@@ -177,6 +177,8 @@ export class GameRoom extends DurableObject {
     this.env = env;
     this.sessions = new Map();
     this.zombies = [];
+    this.blocks = new Map();
+    this.roomOwnerSub = '';
     this.initialized = false;
     this.lastWorldTick = Date.now();
     for (const ws of this.ctx.getWebSockets()) {
@@ -189,6 +191,15 @@ export class GameRoom extends DurableObject {
     if (this.initialized) return;
     this.initialized = true;
     this.zombies = await this.ctx.storage.get('zombies');
+    this.roomOwnerSub = String(await this.ctx.storage.get('roomOwnerSub') || '');
+    const savedBlocks = await this.ctx.storage.get('blocks');
+    if (Array.isArray(savedBlocks)) {
+      for (const block of savedBlocks) {
+        if (!block || !Number.isInteger(block.x) || !Number.isInteger(block.y) || !Number.isInteger(block.z) || !Number.isInteger(block.id)) continue;
+        if (block.x < -64 || block.x > 63 || block.z < -64 || block.z > 63 || block.y < 0 || block.y > 27 || block.id < 0 || block.id > 6) continue;
+        this.blocks.set(block.x + ',' + block.y + ',' + block.z, block);
+      }
+    }
     if (!Array.isArray(this.zombies) || !this.zombies.length) {
       this.zombies = createZombies();
       await this.ctx.storage.put('zombies', this.zombies);
@@ -310,9 +321,17 @@ export class GameRoom extends DurableObject {
     try { msg = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); } catch { return; }
 
     if (msg.type === 'join') {
-      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } }); return; }
+      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, blocks: [...this.blocks.values()] }); return; }
       try {
         const google = await verifyGoogle(String(msg.googleIdToken || ''), this.env);
+        if (this.roomOwnerSub && google.sub !== this.roomOwnerSub && ![...this.sessions.values()].some(s => s.joined && s.googleSub === this.roomOwnerSub)) {
+          this.send(ws, { type: 'room_closed', message: 'El anfitrión no está conectado a este mundo.' });
+          return;
+        }
+        if (!this.roomOwnerSub) {
+          this.roomOwnerSub = google.sub;
+          await this.ctx.storage.put('roomOwnerSub', google.sub);
+        }
         await ensureAccount(this.env, google);
         const saved = await loadPlayer(this.env, google.sub);
         p.googleSub = google.sub;
@@ -368,6 +387,17 @@ export class GameRoom extends DurableObject {
       this.send(ws, { type: 'attack_ack', targetId: zombie.id, damage: 20, zombieHp: zombie.hp });
       return;
     }
+    if (msg.type === 'block_edit') {
+      const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), id = Number(msg.id);
+      if (![x, y, z, id].every(Number.isInteger) || x < -64 || x > 63 || z < -64 || z > 63 || y < 0 || y > 27 || id < 0 || id > 6) return;
+      if (Math.hypot(p.x - x, p.z - z) > 7) return;
+      const key = x + ',' + y + ',' + z;
+      if (id === 0) this.blocks.delete(key);
+      else this.blocks.set(key, { x, y, z, id });
+      await this.ctx.storage.put('blocks', [...this.blocks.values()]);
+      this.broadcast({ type: 'block_edit', x, y, z, id });
+      return;
+    }
     if (msg.type === 'chat') {
       const text = safeText(msg.text, 160);
       if (text) this.broadcast({ type: 'chat', from: p.name, text });
@@ -382,6 +412,13 @@ export class GameRoom extends DurableObject {
     const p = this.refreshSession(ws);
     if (p && p.joined) {
       try { await savePlayer(this.env, p.googleSub, this.playerSaveData(p)); } catch (error) { console.error('[TEKAYM SAVE ON CLOSE]', error?.message || error); }
+      if (p.googleSub && p.googleSub === this.roomOwnerSub) {
+        for (const other of [...this.sessions.values()]) {
+          if (other.id === p.id) continue;
+          this.sessions.delete(other.id);
+          try { other.ws.close(1001, 'El anfitrión salió del mundo'); } catch {}
+        }
+      }
       this.sessions.delete(p.id);
     } else if (p) this.sessions.delete(p.id);
     this.broadcastState();
@@ -421,13 +458,21 @@ export default {
       return json({ ok: true, game: 'Tekaym Online', version: env.GAME_VERSION || 'V1', status: 'online', maxPlayers: MAX_PLAYERS, server: 'cloudflare-durable-object', googleConfigured: Boolean(env.GOOGLE_CLIENT_ID), firebaseConfigured: Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_SERVICE_ACCOUNT_JSON) });
     }
     if (url.pathname === '/auth/google/config') return json({ ok: Boolean(env.GOOGLE_CLIENT_ID), clientId: String(env.GOOGLE_CLIENT_ID || '') });
+    if (url.pathname === '/rooms/create') {
+      const code = crypto.randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase();
+      return json({ ok: true, code, hostMode: 'while-online' });
+    }
     if (url.pathname === '/rooms') {
-      const id = env.GAME_ROOMS.idFromName('main');
+      const code = String(url.searchParams.get('code') || 'main').toUpperCase();
+      if (code !== 'MAIN' && !/^[A-F0-9]{6}$/.test(code)) return json({ ok: false, error: 'Código de mundo inválido' }, 400);
+      const id = env.GAME_ROOMS.idFromName('world:' + code);
       return env.GAME_ROOMS.get(id).fetch(new Request(new URL('/rooms', url), request));
     }
     if (url.pathname === '/ws') {
       if (request.headers.get('Upgrade') !== 'websocket') return json({ ok: false, error: 'WebSocket upgrade requerido' }, 426);
-      const id = env.GAME_ROOMS.idFromName('main');
+      const code = String(url.searchParams.get('room') || 'main').toUpperCase();
+      if (code !== 'MAIN' && !/^[A-F0-9]{6}$/.test(code)) return json({ ok: false, error: 'Código de mundo inválido' }, 400);
+      const id = env.GAME_ROOMS.idFromName('world:' + code);
       return env.GAME_ROOMS.get(id).fetch(request);
     }
     return json({ ok: false, error: 'Not Found' }, 404);
