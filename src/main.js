@@ -247,7 +247,7 @@ $('craftAxe')?.addEventListener('click',craftAxe);$('craftShovel')?.addEventList
 selectedText?.addEventListener('click',openInventory);
 addEventListener('beforeunload',saveWorld);
 addEventListener('pagehide',()=>{if(gameStarted)saveWorld();keys.w=keys.a=keys.s=keys.d=false;keys.shift=false});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(gameStarted)saveWorld();keys.w=keys.a=keys.s=keys.d=false;keys.shift=false;$('touchRun')?.textContent='CORRER';}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(gameStarted)saveWorld();keys.w=keys.a=keys.s=keys.d=false;keys.shift=false;if($('touchRun'))$('touchRun').textContent='CORRER';}});
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
 
 function showLogin(text){loginGate.classList.remove('hidden');loginStatus.textContent=text}
