@@ -185,6 +185,7 @@ function eatFood(){const type=inventory.rawBeef?'rawBeef':inventory.rawPork?'raw
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
 addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();if(e.code==='KeyF')eatFood();});
+$('eatFood')?.addEventListener('click',eatFood);
 addEventListener('mousedown',e=>{if(innerWidth>800&&controls.isLocked){if(e.button===0)mineBlock();if(e.button===2)placeSelectedBlock();}});
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 knifeHit.addEventListener('click',attack);
