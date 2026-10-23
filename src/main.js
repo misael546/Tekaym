@@ -50,12 +50,36 @@ async function loadAssets(){
  spawnProceduralZombies(18);
  updateInventoryHud();
 }
-function randomZombiePosition(){
- for(let i=0;i<100;i++){const x=Math.floor((Math.random()*2-1)*48),z=Math.floor((Math.random()*2-1)*48);if(Math.hypot(x,z)<9)continue;return new THREE.Vector3(x,voxelWorld.getHeightAt(x,z)-1.65,z)}
- return new THREE.Vector3(12,voxelWorld.getHeightAt(12,12)-1.65,12);
+function randomNearPlayer(min=10,max=28){
+ for(let i=0;i<100;i++){const ang=Math.random()*Math.PI*2,d=min+Math.random()*(max-min),x=Math.floor(controls.object.position.x+Math.cos(ang)*d),z=Math.floor(controls.object.position.z+Math.sin(ang)*d),h=voxelWorld.getHeightAt(x,z),gy=Math.floor(h-2.65);
+  if(Math.hypot(x-controls.object.position.x,z-controls.object.position.z)<min)continue;
+  if(voxelWorld.getBlock(x,gy,z)!==BLOCK.GRASS||voxelWorld.getBlock(x,gy+1,z)||voxelWorld.getBlock(x,gy+2,z))continue;
+  return new THREE.Vector3(x,h-2.65,z);
+ }
+ const x=Math.floor(controls.object.position.x+min),z=Math.floor(controls.object.position.z),h=voxelWorld.getHeightAt(x,z);return new THREE.Vector3(x,h-2.65,z);
 }
+function randomZombiePosition(){const p=randomNearPlayer(13,32);p.y=voxelWorld.getHeightAt(p.x,p.z)-1.65;return p}
 function spawnProceduralZombies(count){
- for(let i=0;i<count;i++){const z=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,5,8),new THREE.MeshStandardMaterial({color:0x77706b,roughness:.9}));body.position.y=.8;z.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),new THREE.MeshStandardMaterial({color:0x8d8882,roughness:.9}));head.position.y=1.55;z.add(head);z.position.copy(randomZombiePosition());z.userData={id:'z'+i,hp:45,speed:1.05+Math.random()*.5,phase:Math.random()*6.28};scene.add(z);zombies.push(z)}
+ for(let i=0;i<count;i++){const z=new THREE.Group(),body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,5,8),new THREE.MeshStandardMaterial({color:0x77706b,roughness:.9}));body.position.y=.8;z.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.28,10,8),new THREE.MeshStandardMaterial({color:0x8d8882,roughness:.9}));head.position.y=1.55;z.add(head);z.position.copy(randomZombiePosition());z.userData={id:'z'+i,hp:45,speed:1.05+Math.random()*.5,phase:Math.random()*6.28};z.visible=false;scene.add(z);zombies.push(z)}
+}
+function makeAnimal(type){
+ const root=new THREE.Group(),mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.9}),coat=mat(type==='cow'?0xe8e1d5:type==='pig'?0xeaa0a0:0xf3f0e5),dark=mat(0x42352d),pink=mat(0xf08e96),yellow=mat(0xe8b52d),red=mat(0xb52e39);
+ const size=type==='cow'?[.78,.66,1.05]:type==='pig'?[.72,.5,.9]:[.4,.4,.52],body=new THREE.Mesh(new THREE.BoxGeometry(...size),coat);body.position.y=type==='chicken'?.48:.62;root.add(body);
+ if(type==='cow'){for(const [x,y,z] of [[-.2,.72,.12],[.2,.48,-.18]]){const patch=new THREE.Mesh(new THREE.BoxGeometry(.2,.2,.18),dark);patch.position.set(x,y,z);root.add(patch)}}
+ const head=new THREE.Mesh(type==='chicken'?new THREE.SphereGeometry(.18,8,6):new THREE.BoxGeometry(type==='cow'?.36:.3,type==='cow'?.34:.28,.34),coat);head.position.set(0,type==='chicken'?.76:.83,.44);root.add(head);
+ if(type==='pig'){const snout=new THREE.Mesh(new THREE.BoxGeometry(.19,.13,.09),pink);snout.position.set(0,.8,.63);root.add(snout)}
+ if(type==='chicken'){const beak=new THREE.Mesh(new THREE.ConeGeometry(.07,.14,4),yellow);beak.rotation.x=Math.PI/2;beak.position.set(0,.73,.59);root.add(beak);const comb=new THREE.Mesh(new THREE.SphereGeometry(.06,6,4),red);comb.position.set(0,.96,.42);root.add(comb)}
+ for(const x of [-1,1])for(const z of [-1,1]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.12,type==='chicken'?.25:.38,.12),dark);leg.position.set(x*size[0]*.3,type==='chicken'?.17:.2,z*size[2]*.28);root.add(leg)}
+ root.userData={type,hp:20,walk:Math.random()*6.28,nextTurn:0,dir:Math.random()*Math.PI*2};return root;
+}
+function spawnAnimal(type){const a=makeAnimal(type);a.position.copy(randomNearPlayer(8,26));a.userData.id='animal-'+(++animalSequence);scene.add(a);animals.push(a);return a}
+function updateAnimals(now,dt){
+ if((worldClock<650||worldClock>=1150)&&animals.filter(a=>a.visible).length<8&&now-lastAnimalSpawn>2200){spawnAnimal(['chicken','pig','cow'][Math.floor(Math.random()*3)]);lastAnimalSpawn=now}
+ for(const a of animals){if(!a.visible)continue;a.userData.nextTurn-=dt;if(a.userData.nextTurn<=0){a.userData.dir=Math.random()*Math.PI*2;a.userData.nextTurn=2+Math.random()*4}
+  const speed=a.userData.type==='chicken'?.58:.34,nx=a.position.x+Math.sin(a.userData.dir)*speed*dt,nz=a.position.z+Math.cos(a.userData.dir)*speed*dt;
+  if(Math.hypot(nx-controls.object.position.x,nz-controls.object.position.z)<36){a.position.x=nx;a.position.z=nz;a.position.y=voxelWorld.getHeightAt(nx,nz)-2.65;a.rotation.y=a.userData.dir}
+  if(Math.hypot(a.position.x-controls.object.position.x,a.position.z-controls.object.position.z)>58)a.visible=false;
+ }
 }
 function canOccupy(x,z,eyeY){
  const footY=eyeY-1.65;
@@ -78,7 +102,7 @@ function updateNeeds(dt){
 }
 function roomSaveKey(){return 'tekaym-voxel-save-v2-'+activeRoomCode}
 function saveWorld(){
- try{localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
+ try{localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,worldClock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
 }
 function loadRoomInventory(){
  try{
@@ -147,15 +171,17 @@ function craftIronShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textConten
 function craftIronPickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'ironPickaxe',1,'Pico de hierro');}
 function smeltIron(){if(!hasStation(BLOCK.FURNACE)){hint.textContent='Primero fabrica y coloca un horno cerca.';return;}if(!inventory[BLOCK.IRON_ORE]||!inventory.coal){hint.textContent='Fundir hierro requiere mineral de hierro y carbón.';return;}inventory[BLOCK.IRON_ORE]--;inventory.coal--;inventory.ironIngot++;hint.textContent='Fundiste 1 lingote de hierro.';updateInventoryHud();saveWorld();}
 function attack(){
- if(player.dead||player.cooldown>0)return;
- player.cooldown=.55;if(knife)knife.rotation.z-=.8;
- const origin=controls.object.position.clone(),forward=new THREE.Vector3();camera.getWorldDirection(forward);
- let best=null,bestD=2.25;
- for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
- if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id,weapon:inventory.ironSword?'ironSword':inventory.stoneSword?'stoneSword':inventory.sword?'sword':inventory.ironAxe?'ironAxe':inventory.stoneAxe?'stoneAxe':inventory.axe?'axe':'knife'}));
- else if(!connected&&best){best.userData.hp-=inventory.ironSword>0?60:inventory.stoneSword>0?45:inventory.sword>0?30:inventory.ironAxe>0?40:inventory.stoneAxe>0?35:inventory.axe>0?28:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
+ if(player.dead||player.cooldown>0)return;player.cooldown=.55;if(knife)knife.rotation.z-=.8;
+ const origin=controls.object.position.clone(),forward=new THREE.Vector3();camera.getWorldDirection(forward);let best=null,bestD=2.5,bestType='zombie';
+ for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().add(new THREE.Vector3(0,.8,0)).sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d;bestType='zombie'}}
+ for(const animal of animals){if(!animal.visible)continue;const to=animal.position.clone().add(new THREE.Vector3(0,.55,0)).sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=animal;bestD=d;bestType='animal'}}
+ if(!best)return;
+ const damage=inventory.ironSword?60:inventory.stoneSword?45:inventory.sword?30:inventory.ironAxe?40:inventory.stoneAxe?35:inventory.axe?28:20;
+ if(bestType==='animal'){best.userData.hp-=damage;if(best.userData.hp<=0){if(best.userData.type==='cow'){inventory.rawBeef+=2;if(Math.random()<.7)inventory.leather++}else if(best.userData.type==='pig')inventory.rawPork+=2;else{inventory.rawChicken++;if(Math.random()<.75)inventory.feathers++}best.visible=false;hint.textContent=best.userData.type==='cow'?'Vaca: +2 carne cruda y posibilidad de cuero.':best.userData.type==='pig'?'Cerdo: +2 carne de cerdo.':'Pollo: +1 pollo crudo y posibilidad de plumas.';updateInventoryHud();saveWorld()}return}
+ if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id,weapon:inventory.ironSword?'ironSword':inventory.stoneSword?'stoneSword':inventory.sword?'sword':inventory.ironAxe?'ironAxe':inventory.stoneAxe?'stoneAxe':inventory.axe?'axe':'knife'}));
+ else if(!connected){best.userData.hp-=damage;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{if(isNight()){best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true}},4000)}}
 }
-function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
+function eatFood(){const type=inventory.rawBeef?'rawBeef':inventory.rawPork?'rawPork':inventory.rawChicken?'rawChicken':null;if(!type){hint.textContent='No tienes carne. Caza animales para conseguir comida.';return}inventory[type]--;player.hunger=Math.min(100,player.hunger+28);hint.textContent='Comiste carne cruda: +28 de hambre.';updateInventoryHud();updateHud();saveWorld()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
 addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();if(e.code==='KeyF')eatFood();});
@@ -230,7 +256,7 @@ function applyState(m){
  for(const data of m.zombies||[]){
   const zombie=zombies.find(z=>z.userData.id===data.id);if(!zombie)continue;
   zombie.userData.hp=Number(data.hp??zombie.userData.hp);zombie.userData.targetX=Number(data.x);zombie.userData.targetZ=Number(data.z);
-  zombie.visible=zombie.userData.hp>0;
+  zombie.visible=zombie.userData.hp>0&&isNight();
  }
 }
 function sendMove(now){
@@ -248,7 +274,7 @@ function installTouch(){
  look.addEventListener('pointerdown',e=>{li=e.pointerId;look.setPointerCapture(li)});
  look.addEventListener('pointermove',e=>{if(e.pointerId!==li)return;const v=point(look,lk,e);lookYaw-=v.x*.035;lookPitch=Math.max(-1.2,Math.min(1.2,lookPitch-v.y*.025));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch});
  look.addEventListener('pointerup',()=>{li=null;lk.style.transform='translate(0,0)'});
- $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchSword')?.addEventListener('click',craftSword);$('touchShovel')?.addEventListener('click',craftShovel);$('touchRun')?.addEventListener('click',()=>{keys.shift=!keys.shift;$('touchRun').textContent=keys.shift?'CORRIENDO':'CORRER';});$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
+ $('touchAttack').addEventListener('click',attack);$('touchEat')?.addEventListener('click',eatFood);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchSword')?.addEventListener('click',craftSword);$('touchShovel')?.addEventListener('click',craftShovel);$('touchRun')?.addEventListener('click',()=>{keys.shift=!keys.shift;$('touchRun').textContent=keys.shift?'CORRIENDO':'CORRER';});$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.shadowMap.enabled=innerWidth>800});
