@@ -177,7 +177,7 @@ jobs:
           const apk=fs.readFileSync('.github/workflows/build-android-apk.yml','utf8');
           const checks=[
             [main.includes("screen.orientation.lock('landscape')"),'Browser landscape lock fallback missing'],
-            [main.includes("navigator.maxTouchPoints>0")&&main.includes("isTouchDevice?camera.rotation.y:0"),'Touch-device detection or camera-aligned movement missing'],
+            [main.includes("navigator.maxTouchPoints>0")&&main.includes("const yaw=camera.rotation.y")&&!main.includes("controls.object.rotation.y+(isTouchDevice?camera.rotation.y:0)"),'Touch-device detection or camera-aligned movement missing'],
             [main.includes("lookYaw-=dx*.006")&&main.includes("move.addEventListener('pointercancel',resetMove)")&&main.includes("look.addEventListener('pointercancel',resetLook)"),'Touch camera delta or pointer cancellation recovery missing'],
             [html.includes("@media(pointer:coarse){#touch{display:block!important}"),'Touch HUD may disappear on a landscape phone'],
             [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
