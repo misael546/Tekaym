@@ -23,7 +23,7 @@ const voxelWorld=createVoxelWorld(scene);
 const spawn=voxelWorld.spawn;
 zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
-const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0,13:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,sword:0,stoneSword:0,craftingTable:0,furnace:0};
+const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0,13:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,stoneShovel:0,sword:0,stoneSword:0,ironSword:0,ironAxe:0,ironShovel:0,craftingTable:0,furnace:0};
 let selectedBlock=BLOCK.DIRT;
 try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v2-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 controls.object.position.copy(voxelWorld.spawn);
@@ -89,7 +89,7 @@ function loadRoomInventory(){
  updateInventoryHud();
 }
 function updateInventoryHud(){
- if(inventoryText)inventoryText.textContent='TRONCOS '+inventory[BLOCK.WOOD]+' · TABLAS '+inventory[BLOCK.PLANKS]+' · PALOS '+inventory.sticks+' · PIEDRA '+inventory[BLOCK.STONE]+' · CARBÓN '+inventory.coal+' · HIERRO '+inventory[BLOCK.IRON_ORE]+' · LINGOTES '+inventory.ironIngot+' · ORO '+inventory[BLOCK.GOLD_ORE]+' · DIAMANTES '+inventory[BLOCK.DIAMOND_ORE]+' · PICO MADERA '+inventory.pickaxe+' · PICO PIEDRA '+inventory.stonePickaxe+' · PICO HIERRO '+inventory.ironPickaxe+' · ESPADAS '+(inventory.sword+inventory.stoneSword);
+ if(inventoryText)inventoryText.textContent='TRONCOS '+inventory[BLOCK.WOOD]+' · TABLAS '+inventory[BLOCK.PLANKS]+' · PALOS '+inventory.sticks+' · PIEDRA '+inventory[BLOCK.STONE]+' · CARBÓN '+inventory.coal+' · HIERRO '+inventory[BLOCK.IRON_ORE]+' · LINGOTES '+inventory.ironIngot+' · ORO '+inventory[BLOCK.GOLD_ORE]+' · DIAMANTES '+inventory[BLOCK.DIAMOND_ORE]+' · PICO MADERA '+inventory.pickaxe+' · PICO PIEDRA '+inventory.stonePickaxe+' · PICO HIERRO '+inventory.ironPickaxe+' · ESPADAS '+(inventory.sword+inventory.stoneSword+inventory.ironSword);
  if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
 }
 function mineBlock(){
@@ -139,10 +139,10 @@ function hasStation(id){const px=Math.floor(controls.object.position.x),pz=Math.
 function craftStonePickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo en tu inventario o colocada cerca.';return;}craftRecipe({3:3,sticks:2},'stonePickaxe',1,'Pico de piedra');}
 function craftStoneAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:3,sticks:2},'stoneAxe',1,'Hacha de piedra');}
 function craftStoneSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:2,sticks:1},'stoneSword',1,'Espada de piedra');}
-function craftStoneShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:1,sticks:2},'shovel',1,'Pala de piedra');}
-function craftIronSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:2,sticks:1},'stoneSword',1,'Espada de hierro');}
-function craftIronAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'stoneAxe',1,'Hacha de hierro');}
-function craftIronShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:1,sticks:2},'shovel',1,'Pala de hierro');}
+function craftStoneShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:1,sticks:2},'stoneShovel',1,'Pala de piedra');}
+function craftIronSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:2,sticks:1},'ironSword',1,'Espada de hierro');}
+function craftIronAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'ironAxe',1,'Hacha de hierro');}
+function craftIronShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:1,sticks:2},'ironShovel',1,'Pala de hierro');}
 function craftIronPickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'ironPickaxe',1,'Pico de hierro');}
 function smeltIron(){if(!hasStation(BLOCK.FURNACE)){hint.textContent='Primero fabrica y coloca un horno cerca.';return;}if(!inventory[BLOCK.IRON_ORE]||!inventory.coal){hint.textContent='Fundir hierro requiere mineral de hierro y carbón.';return;}inventory[BLOCK.IRON_ORE]--;inventory.coal--;inventory.ironIngot++;hint.textContent='Fundiste 1 lingote de hierro.';updateInventoryHud();saveWorld();}
 function attack(){
@@ -151,8 +151,8 @@ function attack(){
  const origin=controls.object.position.clone(),forward=new THREE.Vector3();camera.getWorldDirection(forward);
  let best=null,bestD=2.25;
  for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
- if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id,weapon:inventory.stoneSword?'stoneSword':inventory.sword?'sword':inventory.axe?'axe':'knife'}));
- else if(!connected&&best){best.userData.hp-=inventory.stoneSword>0?45:inventory.sword>0?30:inventory.axe>0?28:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
+ if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id,weapon:inventory.ironSword?'ironSword':inventory.stoneSword?'stoneSword':inventory.sword?'sword':inventory.axe?'axe':'knife'}));
+ else if(!connected&&best){best.userData.hp-=inventory.ironSword>0?60:inventory.stoneSword>0?45:inventory.sword>0?30:inventory.axe>0?28:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
