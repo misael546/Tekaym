@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const MAX_PLAYERS = 16;
 const MAX_ZOMBIES = 18;
-const WORLD = { minX: -62, maxX: 62, minZ: -62, maxZ: 62 };
+const WORLD = { minX: -100000, maxX: 100000, minZ: -100000, maxZ: 100000 };
 const MOVE_SPEED_LIMIT = 4.8;
 const ATTACK_COOLDOWN_MS = 520;
 const PLAYER_SAVE_MS = 120000;
@@ -196,7 +196,7 @@ export class GameRoom extends DurableObject {
     if (Array.isArray(savedBlocks)) {
       for (const block of savedBlocks) {
         if (!block || !Number.isInteger(block.x) || !Number.isInteger(block.y) || !Number.isInteger(block.z) || !Number.isInteger(block.id)) continue;
-        if (block.x < -64 || block.x > 63 || block.z < -64 || block.z > 63 || block.y < 0 || block.y > 27 || block.id < 0 || block.id > 6) continue;
+        if (Math.abs(block.x) > 100000 || Math.abs(block.z) > 100000 || block.y < 0 || block.y > 27 || block.id < 0 || block.id > 6) continue;
         this.blocks.set(block.x + ',' + block.y + ',' + block.z, block);
       }
     }
@@ -389,7 +389,7 @@ export class GameRoom extends DurableObject {
     }
     if (msg.type === 'block_edit') {
       const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), id = Number(msg.id);
-      if (![x, y, z, id].every(Number.isInteger) || x < -64 || x > 63 || z < -64 || z > 63 || y < 0 || y > 27 || id < 0 || id > 6) return;
+      if (![x, y, z, id].every(Number.isInteger) || Math.abs(x) > 100000 || Math.abs(z) > 100000 || y < 0 || y > 27 || id < 0 || id > 6) return;
       if (Math.hypot(p.x - x, p.z - z) > 7) return;
       const key = x + ',' + y + ',' + z;
       // Keep AIR edits as tombstones so generated terrain stays broken for later visitors.
