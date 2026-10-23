@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const CHUNK_SIZE = 16;
-const RENDER_DISTANCE = 3;
+const RENDER_DISTANCE = typeof window !== 'undefined' && window.innerWidth <= 800 ? 2 : 3;
 const MAX_Y = 28;
 const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6 });
 const COLORS = {
@@ -121,9 +121,18 @@ export function createVoxelWorld(scene) {
     for (const ck of Array.from(dataChunks)) {
       if (!wanted.has(ck)) { const [cx, cz] = ck.split(',').map(Number); unloadChunkData(cx, cz); }
     }
+    const rebuild = new Set();
     for (const ck of wanted) {
       const [cx, cz] = ck.split(',').map(Number);
-      if (!chunks.has(ck)) buildChunk(cx, cz);
+      ensureChunkData(cx, cz);
+      if (!chunks.has(ck)) {
+        rebuild.add(chunkKey(cx - 1, cz)); rebuild.add(chunkKey(cx + 1, cz));
+        rebuild.add(chunkKey(cx, cz - 1)); rebuild.add(chunkKey(cx, cz + 1));
+      }
+    }
+    for (const ck of wanted) {
+      const [cx, cz] = ck.split(',').map(Number);
+      if (!chunks.has(ck) || rebuild.has(ck)) buildChunk(cx, cz);
     }
   }
 
