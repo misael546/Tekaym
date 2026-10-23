@@ -75,6 +75,8 @@ jobs:
             [main.includes("voxelWorld.updateStreaming(controls.object.position)"),'Player movement does not stream chunks'],
             [worker.includes("url.pathname === '/rooms/create'"),'Room-code creation route missing'],
             [worker.includes("msg.type === 'block_edit'"),'Server block synchronization missing'],
+            [worker.includes('y > 47')&&worker.includes('id > 13'),'Expanded terrain and ore block sync bounds missing'],
+            [worker.includes("weapon === 'ironSword'")&&worker.includes("weapon === 'stoneAxe'"),'Multiplayer weapon tiers missing'],
             [worker.includes("Keep AIR edits as tombstones"),'Broken-block persistence missing'],
             [html.includes('id="createWorldButton"')&&html.includes('id="joinWorldButton"'),'World create/join controls missing'],
             [html.includes('id="touchMine"')&&html.includes('id="touchPlace"'),'Mobile block controls missing']
