@@ -52,7 +52,7 @@ export function createVoxelWorld(scene) {
     return blocks.get(key(x, y, z)) || BLOCK.AIR;
   }
   function putRaw(x, y, z, id) {
-    if (y < 0 || y >= MAX_Y) return;
+    if (x < -HALF_WORLD || x >= HALF_WORLD || z < -HALF_WORLD || z >= HALF_WORLD || y < 0 || y >= MAX_Y) return;
     const k = key(x, y, z);
     if (id === BLOCK.AIR) blocks.delete(k);
     else blocks.set(k, id);
@@ -89,6 +89,7 @@ export function createVoxelWorld(scene) {
   }
 
   function buildChunk(cx, cz) {
+    if (cx < -WORLD_CHUNKS / 2 || cx >= WORLD_CHUNKS / 2 || cz < -WORLD_CHUNKS / 2 || cz >= WORLD_CHUNKS / 2) return;
     const ck = chunkKey(cx, cz);
     const old = chunks.get(ck);
     if (old) { group.remove(old); old.geometry.dispose(); }
@@ -171,7 +172,7 @@ export function createVoxelWorld(scene) {
     const hit = targetFromCamera(camera);
     if (!hit) return false;
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
-    if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
+    if (x < -HALF_WORLD || x >= HALF_WORLD || z < -HALF_WORLD || z >= HALF_WORLD || getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
     if (playerPosition && Math.abs(x + 0.5 - playerPosition.x) < 0.8 && Math.abs(z + 0.5 - playerPosition.z) < 0.8 && y < playerPosition.y + 1.8 && y + 1 > playerPosition.y - 1.8) return false;
     putRaw(x, y, z, id);
     changes.set(key(x, y, z), id);
