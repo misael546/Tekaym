@@ -2,7 +2,9 @@
 
 ## Dirección
 
-Juego de supervivencia 3D en primera persona con mundo cúbico, construcción por bloques, recolección, fabricación, zombis y necesidades de supervivencia. La antigua prisión queda como prototipo de origen; la dirección jugable nueva es un mundo abierto cúbico.
+Tekaym Online es un único proyecto y una única base de desarrollo. No se mantienen copias paralelas del juego anterior ni se mezclan archivos de NeonCore o DarkPixel Online.
+
+Juego de supervivencia 3D en primera persona con mundo cúbico, construcción por bloques, recolección, fabricación, animales, zombis y necesidades de supervivencia. El mundo cúbico procedural es la única base jugable; el mapa antiguo de prisión ya no forma parte del juego.
 
 ## Mundo cúbico
 
@@ -18,7 +20,7 @@ Juego de supervivencia 3D en primera persona con mundo cúbico, construcción po
 
 - Vida, resistencia, hambre y sed existentes.
 - Zombis que persiguen al jugador en el prototipo local.
-- Cuchillo inicial y recetas de pico/hacha en la primera iteración.
+- El jugador comienza con las manos vacías; las herramientas se fabrican con recursos recogidos.
 - Próximas mejoras: durabilidad, daño por herramienta, armadura, curación, ciclos día/noche y dificultad progresiva.
 
 ## Inventario y fabricación
