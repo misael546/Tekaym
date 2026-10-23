@@ -336,6 +336,7 @@ export class GameRoom extends DurableObject {
   }
 
   ensureAnimalsNearPlayers() {
+    if (!(this.worldClock < 650 || this.worldClock >= 1150)) return;
     const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
     if (!active.length) return;
     while (this.animals.length < MAX_ANIMALS) {
