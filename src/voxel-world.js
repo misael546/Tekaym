@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 const CHUNK_SIZE = 16;
-const WORLD_CHUNKS = 7;
+const WORLD_CHUNKS = 8;
 const WORLD_SIZE = CHUNK_SIZE * WORLD_CHUNKS;
 const HALF_WORLD = WORLD_SIZE / 2;
 const MAX_Y = 28;
@@ -41,6 +41,7 @@ export function createVoxelWorld(scene) {
   const blocks = new Map();
   const chunks = new Map();
   const materials = new Map();
+  const changes = new Map();
   const raycaster = new THREE.Raycaster();
   raycaster.far = 6;
   const center = new THREE.Vector3();
@@ -162,8 +163,9 @@ export function createVoxelWorld(scene) {
     const id = getBlock(hit.x, hit.y, hit.z);
     if (!id || hit.y <= 0) return false;
     putRaw(hit.x, hit.y, hit.z, BLOCK.AIR);
+    changes.set(key(hit.x, hit.y, hit.z), BLOCK.AIR);
     rebuildAt(hit.x, hit.z);
-    return true;
+    return id;
   }
   function placeBlock(camera, id = BLOCK.DIRT, playerPosition = null) {
     const hit = targetFromCamera(camera);
@@ -172,10 +174,45 @@ export function createVoxelWorld(scene) {
     if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
     if (playerPosition && Math.abs(x + 0.5 - playerPosition.x) < 0.8 && Math.abs(z + 0.5 - playerPosition.z) < 0.8 && y < playerPosition.y + 1.8 && y + 1 > playerPosition.y - 1.8) return false;
     putRaw(x, y, z, id);
+    changes.set(key(x, y, z), id);
     rebuildAt(x, z);
     return true;
   }
   function getHeightAt(x, z) { return surfaceY(Math.floor(x), Math.floor(z)) + 1.65; }
+  function applyChanges(saved) {
+    if (!Array.isArray(saved)) return;
+    for (const entry of saved) {
+      if (!entry || !Number.isInteger(entry.x) || !Number.isInteger(entry.y) || !Number.isInteger(entry.z)) continue;
+      if (entry.x < -HALF_WORLD || entry.x >= HALF_WORLD || entry.z < -HALF_WORLD || entry.z >= HALF_WORLD || entry.y < 0 || entry.y >= MAX_Y) continue;
+      const id = Number(entry.id);
+      if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.LEAVES) continue;
+      putRaw(entry.x, entry.y, entry.z, id);
+      changes.set(key(entry.x, entry.y, entry.z), id);
+    }
+    const touched = new Set();
+    for (const entry of saved) {
+      if (!entry || !Number.isInteger(entry.x) || !Number.isInteger(entry.z)) continue;
+      const cx = Math.floor(entry.x / CHUNK_SIZE), cz = Math.floor(entry.z / CHUNK_SIZE);
+      touched.add(chunkKey(cx, cz));
+      if ((entry.x - cx * CHUNK_SIZE) === 0) touched.add(chunkKey(cx - 1, cz));
+      if ((entry.x - cx * CHUNK_SIZE) === CHUNK_SIZE - 1) touched.add(chunkKey(cx + 1, cz));
+      if ((entry.z - cz * CHUNK_SIZE) === 0) touched.add(chunkKey(cx, cz - 1));
+      if ((entry.z - cz * CHUNK_SIZE) === CHUNK_SIZE - 1) touched.add(chunkKey(cx, cz + 1));
+    }
+    for (const ck of touched) {
+      const [cx, cz] = ck.split(',').map(Number);
+      if (chunks.has(ck)) buildChunk(cx, cz);
+    }
+  }
+  function serializeChanges() {
+    return Array.from(changes, ([k, id]) => {
+      const [x, y, z] = k.split(',').map(Number);
+      return { x, y, z, id };
+    });
+  }
+  function blockName(id) {
+    return ({1:'Pasto',2:'Tierra',3:'Piedra',4:'Arena',5:'Madera',6:'Hojas'})[id] || 'Bloque';
+  }
   function dispose() {
     for (const mesh of chunks.values()) mesh.geometry.dispose();
     for (const material of materials.values()) material.dispose();
@@ -184,6 +221,7 @@ export function createVoxelWorld(scene) {
 
   return {
     group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
+    applyChanges, serializeChanges, blockName,
     get spawn() { return new THREE.Vector3(0.5, getHeightAt(0, 0), 0.5); },
     dispose
   };
