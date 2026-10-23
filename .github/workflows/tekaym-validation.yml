@@ -50,6 +50,30 @@ jobs:
           test -f worker/wrangler.jsonc
           test -f firestore.rules
           echo 'Tekaym structure OK'
+      - name: Validate voxel world and personal rooms
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          const checks=[
+            [main.includes("createVoxelWorld(scene)"),'Voxel world is not integrated into the client'],
+            [main.includes("voxelWorld.breakBlock(camera)"),'Mining action missing'],
+            [main.includes("voxelWorld.placeBlock(camera"),'Block placement missing'],
+            [main.includes("voxelWorld.resetChanges()"),'Room-switch reset missing'],
+            [main.includes("navigator.clipboard.writeText(activeRoomCode)"),'Invite-code copy action missing'],
+            [voxel.includes("serializeChanges")&&voxel.includes("resetChanges"),'Voxel save/reset API missing'],
+            [worker.includes("url.pathname === '/rooms/create'"),'Room-code creation route missing'],
+            [worker.includes("msg.type === 'block_edit'"),'Server block synchronization missing'],
+            [worker.includes("Keep AIR edits as tombstones"),'Broken-block persistence missing'],
+            [html.includes('id="createWorldButton"')&&html.includes('id="joinWorldButton"'),'World create/join controls missing'],
+            [html.includes('id="touchMine"')&&html.includes('id="touchPlace"'),'Mobile block controls missing']
+          ];
+          for(const [ok,message] of checks)if(!ok)throw new Error(message);
+          console.log('Voxel world and personal-room integration OK');
+          NODE
       - name: Validate isolated demo modules
         run: |
           node - <<'NODE'
