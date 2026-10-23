@@ -100,7 +100,7 @@ function mineBlock(){
  if(toolNeeded&&!inventory[toolNeeded]){hint.textContent=toolNeeded==='pickaxe'?'Necesitas un pico de madera para picar piedra y carbón.':toolNeeded==='stonePickaxe'?'Necesitas un pico de piedra para extraer hierro.':'Necesitas un pico de hierro para extraer oro y diamante.';return;}
  const removed=voxelWorld.breakBlock(camera);if(!removed)return;
  const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE };
- const drop=drops[removed];if(drop!==undefined)inventory[drop]=(inventory[drop]||0)+1;
+ const drop=drops[removed];if(drop!==undefined)inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0)?2:1);
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  updateInventoryHud();saveWorld();
 }
@@ -139,6 +139,10 @@ function hasStation(id){const px=Math.floor(controls.object.position.x),pz=Math.
 function craftStonePickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo en tu inventario o colocada cerca.';return;}craftRecipe({3:3,sticks:2},'stonePickaxe',1,'Pico de piedra');}
 function craftStoneAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:3,sticks:2},'stoneAxe',1,'Hacha de piedra');}
 function craftStoneSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:2,sticks:1},'stoneSword',1,'Espada de piedra');}
+function craftStoneShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:1,sticks:2},'shovel',1,'Pala de piedra');}
+function craftIronSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:2,sticks:1},'stoneSword',1,'Espada de hierro');}
+function craftIronAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'stoneAxe',1,'Hacha de hierro');}
+function craftIronShovel(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:1,sticks:2},'shovel',1,'Pala de hierro');}
 function craftIronPickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({ironIngot:3,sticks:2},'ironPickaxe',1,'Pico de hierro');}
 function smeltIron(){if(!hasStation(BLOCK.FURNACE)){hint.textContent='Primero fabrica y coloca un horno cerca.';return;}if(!inventory[BLOCK.IRON_ORE]||!inventory.coal){hint.textContent='Fundir hierro requiere mineral de hierro y carbón.';return;}inventory[BLOCK.IRON_ORE]--;inventory.coal--;inventory.ironIngot++;hint.textContent='Fundiste 1 lingote de hierro.';updateInventoryHud();saveWorld();}
 function attack(){
@@ -163,7 +167,7 @@ $('copyRoomButton')?.addEventListener('click',async()=>{try{await navigator.clip
 $('craftPlanks')?.addEventListener('click',craftPlanks);
 $('craftSticks')?.addEventListener('click',craftSticks);
 $('craftPickaxe')?.addEventListener('click',craftPickaxe);
-$('craftAxe')?.addEventListener('click',craftAxe);$('craftShovel')?.addEventListener('click',craftShovel);$('craftSword')?.addEventListener('click',craftSword);$('craftTable')?.addEventListener('click',craftTable);$('craftStonePickaxe')?.addEventListener('click',craftStonePickaxe);$('craftStoneAxe')?.addEventListener('click',craftStoneAxe);$('craftStoneSword')?.addEventListener('click',craftStoneSword);$('craftIronPickaxe')?.addEventListener('click',craftIronPickaxe);$('craftFurnace')?.addEventListener('click',()=>craftRecipe({3:8},BLOCK.FURNACE,1,'Horno'));$('smeltIron')?.addEventListener('click',smeltIron);
+$('craftAxe')?.addEventListener('click',craftAxe);$('craftShovel')?.addEventListener('click',craftShovel);$('craftSword')?.addEventListener('click',craftSword);$('craftTable')?.addEventListener('click',craftTable);$('craftStonePickaxe')?.addEventListener('click',craftStonePickaxe);$('craftStoneAxe')?.addEventListener('click',craftStoneAxe);$('craftStoneSword')?.addEventListener('click',craftStoneSword);$('craftStoneShovel')?.addEventListener('click',craftStoneShovel);$('craftIronPickaxe')?.addEventListener('click',craftIronPickaxe);$('craftIronSword')?.addEventListener('click',craftIronSword);$('craftIronAxe')?.addEventListener('click',craftIronAxe);$('craftIronShovel')?.addEventListener('click',craftIronShovel);$('craftFurnace')?.addEventListener('click',()=>craftRecipe({3:8},BLOCK.FURNACE,1,'Horno'));$('smeltIron')?.addEventListener('click',smeltIron);
 selectedText?.addEventListener('click',selectNextBlock);
 addEventListener('beforeunload',saveWorld);
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
