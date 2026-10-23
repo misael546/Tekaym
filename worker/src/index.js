@@ -338,7 +338,7 @@ export class GameRoom extends DurableObject {
   ensureAnimalsNearPlayers() {
     const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
     if (!active.length) return;
-    while (this.animals.filter(a => a.hp > 0).length < MAX_ANIMALS) {
+    while (this.animals.length < MAX_ANIMALS) {
       const player = active[Math.floor(Math.random() * active.length)];
       const type = ANIMAL_TYPES[Math.floor(Math.random() * ANIMAL_TYPES.length)];
       this.animals.push(createAnimal(type, player));
