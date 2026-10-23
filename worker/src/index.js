@@ -170,6 +170,28 @@ function createZombies() {
   });
 }
 
+const MAX_ANIMALS = 10;
+const ANIMAL_TYPES = ['chicken', 'pig', 'cow'];
+function randomAnimalSpot(player, min = 8, max = 26) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = min + Math.random() * (max - min);
+    const x = clamp(Math.round(player.x + Math.cos(angle) * distance), WORLD.minX, WORLD.maxX);
+    const z = clamp(Math.round(player.z + Math.sin(angle) * distance), WORLD.minZ, WORLD.maxZ);
+    if (!isInsideCell(x, z, -0.1)) return { x, z };
+  }
+  return { x: clamp(player.x + min, WORLD.minX, WORLD.maxX), z: clamp(player.z, WORLD.minZ, WORLD.maxZ) };
+}
+function createAnimal(type, player) {
+  const pos = randomAnimalSpot(player);
+  return { id: 'animal-' + uid(), type, x: pos.x, z: pos.z, hp: 20, maxHp: 20, speed: type === 'chicken' ? 0.58 : 0.34, dir: Math.random() * Math.PI * 2, turnAt: Date.now() + 2000 + Math.random() * 4000, respawnAt: 0 };
+}
+function animalDrops(type) {
+  if (type === 'cow') return { rawBeef: 2, ...(Math.random() < 0.7 ? { leather: 1 } : {}) };
+  if (type === 'pig') return { rawPork: 2 };
+  return { rawChicken: 1, ...(Math.random() < 0.75 ? { feathers: 1 } : {}) };
+}
+
 export class GameRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -177,6 +199,7 @@ export class GameRoom extends DurableObject {
     this.env = env;
     this.sessions = new Map();
     this.zombies = [];
+    this.animals = [];
     this.blocks = new Map();
     this.roomOwnerSub = '';
     this.initialized = false;
@@ -192,6 +215,8 @@ export class GameRoom extends DurableObject {
     if (this.initialized) return;
     this.initialized = true;
     this.zombies = await this.ctx.storage.get('zombies');
+    this.animals = await this.ctx.storage.get('animals');
+    if (!Array.isArray(this.animals)) this.animals = [];
     const savedWorldClock = await this.ctx.storage.get('worldClock');
     this.worldClock = Number.isFinite(Number(savedWorldClock)) ? ((Number(savedWorldClock) % 1200) + 1200) % 1200 : 0;
     this.roomOwnerSub = String(await this.ctx.storage.get('roomOwnerSub') || '');
@@ -310,6 +335,48 @@ export class GameRoom extends DurableObject {
     }
   }
 
+  ensureAnimalsNearPlayers() {
+    const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+    if (!active.length) return;
+    while (this.animals.filter(a => a.hp > 0).length < MAX_ANIMALS) {
+      const player = active[Math.floor(Math.random() * active.length)];
+      const type = ANIMAL_TYPES[Math.floor(Math.random() * ANIMAL_TYPES.length)];
+      this.animals.push(createAnimal(type, player));
+    }
+  }
+
+  moveAnimals(dt) {
+    const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+    if (!active.length) return;
+    const now = Date.now(), step = clamp(dt, 0, 5);
+    const daylight = this.worldClock < 650 || this.worldClock >= 1150;
+    if (daylight) this.ensureAnimalsNearPlayers();
+    for (const animal of this.animals) {
+      if (animal.hp <= 0) {
+        if (animal.respawnAt && now >= animal.respawnAt && daylight) {
+          const player = active[Math.floor(Math.random() * active.length)];
+          const pos = randomAnimalSpot(player);
+          animal.x = pos.x; animal.z = pos.z; animal.hp = animal.maxHp; animal.respawnAt = 0;
+          animal.dir = Math.random() * Math.PI * 2; animal.turnAt = now + 2000 + Math.random() * 4000;
+        }
+        continue;
+      }
+      if (now >= Number(animal.turnAt || 0)) {
+        animal.dir = Math.random() * Math.PI * 2;
+        animal.turnAt = now + 2000 + Math.random() * 4000;
+      }
+      const speed = Number(animal.speed) || 0.34;
+      const nx = clamp(animal.x + Math.sin(animal.dir) * speed * step, WORLD.minX, WORLD.maxX);
+      const nz = clamp(animal.z + Math.cos(animal.dir) * speed * step, WORLD.minZ, WORLD.maxZ);
+      if (!isInsideCell(nx, nz, 0)) { animal.x = nx; animal.z = nz; }
+      const nearest = Math.min(...active.map(p => Math.hypot(p.x - animal.x, p.z - animal.z)));
+      if (nearest > 62) {
+        animal.hp = 0;
+        animal.respawnAt = now + 5000;
+      }
+    }
+  }
+
   statePayload() {
     return {
       type: 'state',
@@ -318,7 +385,8 @@ export class GameRoom extends DurableObject {
         id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp,
         stamina: p.stamina, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId
       })),
-      zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp }))
+      zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp })),
+      animals: this.animals.map(a => ({ id: a.id, type: a.type, x: a.x, z: a.z, hp: a.hp, maxHp: a.maxHp }))
     };
   }
 
@@ -401,6 +469,24 @@ export class GameRoom extends DurableObject {
       this.send(ws, { type: 'attack_ack', targetId: zombie.id, damage, zombieHp: zombie.hp });
       return;
     }
+    if (msg.type === 'animal_attack') {
+      if (now - Number(p.lastAttack || 0) < ATTACK_COOLDOWN_MS) return;
+      const targetId = safeText(msg.targetId, 48);
+      const animal = this.animals.find(a => a.id === targetId);
+      if (!animal || animal.hp <= 0 || !ANIMAL_TYPES.includes(animal.type)) return;
+      if (Math.hypot(p.x - animal.x, p.z - animal.z) > 2.8) return;
+      p.lastAttack = now;
+      const weapon = ['knife','sword','stoneSword','ironSword','axe','stoneAxe','ironAxe'].includes(msg.weapon) ? msg.weapon : 'knife';
+      const damage = weapon === 'ironSword' ? 60 : weapon === 'stoneSword' ? 45 : weapon === 'sword' ? 30 : weapon === 'ironAxe' ? 40 : weapon === 'stoneAxe' ? 35 : weapon === 'axe' ? 28 : 20;
+      animal.hp = Math.max(0, animal.hp - damage);
+      if (animal.hp <= 0) {
+        animal.respawnAt = now + 45000 + Math.floor(Math.random() * 30000);
+        this.send(ws, { type: 'animal_killed', targetId: animal.id, animalType: animal.type, drops: animalDrops(animal.type) });
+      }
+      await this.ctx.storage.put('animals', this.animals);
+      this.broadcastState();
+      return;
+    }
     if (msg.type === 'block_edit') {
       const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), id = Number(msg.id);
       if (![x, y, z, id].every(Number.isInteger) || Math.abs(x) > 100000 || Math.abs(z) > 100000 || y < 0 || y > 47 || id < 0 || id > 13) return;
@@ -466,8 +552,10 @@ export class GameRoom extends DurableObject {
     }
     this.moveZombies(elapsed || 1);
     this.worldClock = (this.worldClock + (elapsed || 1)) % 1200;
+    this.moveAnimals(elapsed || 1);
     await this.ctx.storage.put('worldClock', this.worldClock);
     await this.ctx.storage.put('zombies', this.zombies);
+    await this.ctx.storage.put('animals', this.animals);
     if (this.sessions.size) this.broadcastState();
     await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
   }
