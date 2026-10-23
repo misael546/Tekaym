@@ -380,8 +380,8 @@ export class GameRoom extends DurableObject {
       if (!zombie || zombie.hp <= 0) return;
       if (Math.hypot(p.x - zombie.x, p.z - zombie.z) > 2.65) return;
       p.lastAttack = now;
-      const weapon = ['knife','sword','stoneSword','axe'].includes(msg.weapon) ? msg.weapon : 'knife';
-      const damage = weapon === 'stoneSword' ? 45 : weapon === 'sword' ? 30 : weapon === 'axe' ? 28 : 20;
+      const weapon = ['knife','sword','stoneSword','ironSword','axe','ironAxe'].includes(msg.weapon) ? msg.weapon : 'knife';
+      const damage = weapon === 'ironSword' ? 60 : weapon === 'stoneSword' ? 45 : weapon === 'sword' ? 30 : weapon === 'ironAxe' ? 40 : weapon === 'axe' ? 28 : 20;
       zombie.hp = Math.max(0, zombie.hp - damage);
       if (zombie.hp <= 0) zombie.respawnAt = now + 6000;
       this.persistSession(ws, p);
