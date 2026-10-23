@@ -22,7 +22,7 @@ const voxelWorld=createVoxelWorld(scene);
 const spawn=voxelWorld.spawn;
 controls.object.position.copy(spawn);zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
-const inventory={1:24,2:32,3:0,4:0,5:0,6:0};
+const inventory={1:24,2:32,3:0,4:0,5:0,6:0,planks:0,sticks:0,pickaxe:0,axe:0};
 let selectedBlock=BLOCK.DIRT;
 try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v1')||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
@@ -67,7 +67,7 @@ function saveWorld(){
  try{localStorage.setItem('tekaym-voxel-save-v1',JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
 }
 function updateInventoryHud(){
- if(inventoryText)inventoryText.textContent='TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0);
+ if(inventoryText)inventoryText.textContent='TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0)+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks;
  if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
 }
 function mineBlock(){
@@ -87,6 +87,22 @@ function selectNextBlock(){
  const ids=[BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.SAND,BLOCK.GRASS];
  const at=Math.max(0,ids.indexOf(selectedBlock));selectedBlock=ids[(at+1)%ids.length];updateInventoryHud();saveWorld();
 }
+function craftPlanks(){
+ if(inventory[BLOCK.WOOD]<1)return;
+ inventory[BLOCK.WOOD]--;inventory.planks+=4;updateInventoryHud();saveWorld();
+}
+function craftSticks(){
+ if(inventory.planks<2)return;
+ inventory.planks-=2;inventory.sticks+=4;updateInventoryHud();saveWorld();
+}
+function craftPickaxe(){
+ if(inventory.planks<3||inventory.sticks<2)return;
+ inventory.planks-=3;inventory.sticks-=2;inventory.pickaxe++;updateInventoryHud();saveWorld();
+}
+function craftAxe(){
+ if(inventory.planks<3||inventory.sticks<2)return;
+ inventory.planks-=3;inventory.sticks-=2;inventory.axe++;updateInventoryHud();saveWorld();
+}
 function attack(){
  if(player.dead||player.cooldown>0)return;
  player.cooldown=.55;if(knife)knife.rotation.z-=.8;
@@ -94,7 +110,7 @@ function attack(){
  let best=null,bestD=2.25;
  for(const z of zombies){if(!z.visible||z.userData.hp<=0)continue;const to=z.position.clone().sub(origin),d=to.length();if(d>bestD)continue;to.normalize();if(forward.dot(to)<.15)continue;if(d<bestD){best=z;bestD=d}}
  if(socket?.readyState===WebSocket.OPEN&&connected&&best)socket.send(JSON.stringify({type:'knife_attack',targetId:best.userData.id}));
- else if(!connected&&best){best.userData.hp-=20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
+ else if(!connected&&best){best.userData.hp-=inventory.axe>0?30:20;if(best.userData.hp<=0){best.visible=false;setTimeout(()=>{best.position.copy(randomZombiePosition());best.userData.hp=45;best.visible=true},4000)}}
 }
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
@@ -105,6 +121,10 @@ renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 knifeHit.addEventListener('click',attack);
 mineButton?.addEventListener('click',mineBlock);
 placeButton?.addEventListener('click',placeSelectedBlock);
+$('craftPlanks')?.addEventListener('click',craftPlanks);
+$('craftSticks')?.addEventListener('click',craftSticks);
+$('craftPickaxe')?.addEventListener('click',craftPickaxe);
+$('craftAxe')?.addEventListener('click',craftAxe);
 selectedText?.addEventListener('click',selectNextBlock);
 addEventListener('beforeunload',saveWorld);
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
@@ -164,7 +184,7 @@ function installTouch(){
  look.addEventListener('pointerdown',e=>{li=e.pointerId;look.setPointerCapture(li)});
  look.addEventListener('pointermove',e=>{if(e.pointerId!==li)return;const v=point(look,lk,e);lookYaw-=v.x*.035;lookPitch=Math.max(-1.2,Math.min(1.2,lookPitch-v.y*.025));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch});
  look.addEventListener('pointerup',()=>{li=null;lk.style.transform='translate(0,0)'});
- $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
+ $('touchAttack').addEventListener('click',attack);$('touchMine').addEventListener('click',mineBlock);$('touchPlace').addEventListener('click',placeSelectedBlock);$('touchSelect').addEventListener('click',selectNextBlock);$('touchCraft')?.addEventListener('click',craftPlanks);$('touchFs').addEventListener('click',()=>document.documentElement.requestFullscreen?.());
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
