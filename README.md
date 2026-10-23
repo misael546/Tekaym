@@ -31,13 +31,13 @@ Juego de supervivencia 3D en primera persona, en transición desde el prototipo 
 
 ## Desarrollo pendiente
 
-- Sincronización autoritativa de los bloques con el servidor.
-- Mundos personales compartibles mediante códigos de invitación.
-- Guardado remoto de los mundos y acceso de amigos.
+- Pruebas y endurecimiento de la sincronización de bloques por mundo.
+- Probar la creación de mundos con códigos de invitación y el cierre cuando el anfitrión se desconecta.
+- Verificar el guardado remoto del mundo y el acceso de amigos.
 - Mejoras de IA, animaciones, herramientas y recetas.
 - Empaquetado y pruebas de una APK Android.
 
-La URL del Worker sigue pendiente de configurar en `src/config.js`; por eso la base multijugador no debe considerarse lista. El guardado actual de bloques es local al dispositivo/navegador y todavía no se comparte entre amigos.
+La rama de desarrollo ya contiene rutas para crear salas, entrar con código y sincronizar cambios de bloques mediante Durable Objects. Sin embargo, la URL del Worker sigue pendiente de configurar en `src/config.js`, por lo que el multijugador no se puede probar desde el cliente publicado todavía. El guardado local funciona como respaldo; la sincronización remota requiere despliegue y pruebas.
 
 ## Arquitectura existente
 
