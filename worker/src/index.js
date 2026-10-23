@@ -428,6 +428,8 @@ export class GameRoom extends DurableObject {
         p.joined = true;
         await savePlayer(this.env, google.sub, this.playerSaveData(p));
         this.persistSession(ws, p);
+        this.ensureAnimalsNearPlayers();
+        await this.ctx.storage.put('animals', this.animals);
         this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, worldClock: this.worldClock });
         this.broadcastState();
       } catch (error) {
