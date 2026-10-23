@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const MAX_PLAYERS = 16;
 const MAX_ZOMBIES = 18;
-const WORLD = { minX: -108, maxX: 108, minZ: -88, maxZ: 88 };
+const WORLD = { minX: -62, maxX: 62, minZ: -62, maxZ: 62 };
 const MOVE_SPEED_LIMIT = 4.8;
 const ATTACK_COOLDOWN_MS = 520;
 const PLAYER_SAVE_MS = 120000;
@@ -157,8 +157,8 @@ function isInsideCell(x, z, margin = 0) {
 function randomCellSpawn() { return CELLS[Math.floor(Math.random() * CELLS.length)]; }
 function randomZombieSpot() {
   for (let attempt = 0; attempt < 250; attempt++) {
-    const x = (Math.random() * 2 - 1) * 96;
-    const z = (Math.random() * 2 - 1) * 78;
+    const x = (Math.random() * 2 - 1) * 54;
+    const z = (Math.random() * 2 - 1) * 54;
     if (!isInsideCell(x, z, -0.1)) return { x, z };
   }
   return { x: 0, z: 0 };
@@ -216,7 +216,7 @@ export class GameRoom extends DurableObject {
     if (this.sessions.size >= MAX_PLAYERS) return json({ ok: false, error: 'Servidor lleno', maxPlayers: MAX_PLAYERS }, 503);
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
-    const cell = randomCellSpawn();
+    const cell = { x: Math.round((Math.random() * 12 - 6) * 10) / 10, z: Math.round((Math.random() * 12 - 6) * 10) / 10, id: 'MUNDO' };
     const session = {
       id: uid(), name: 'Jugador', googleSub: '', email: '',
       x: cell.x, z: cell.z, cellId: cell.id,
