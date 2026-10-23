@@ -32,27 +32,72 @@ jobs:
         run: |
           cp src/main.js /tmp/tekaym-main.mjs
           cp src/config.js /tmp/tekaym-config.mjs
-          cp src/prison.js /tmp/tekaym-prison.mjs
+          cp src/voxel-world.js /tmp/tekaym-voxel-world.mjs
           node --check /tmp/tekaym-main.mjs
           node --check /tmp/tekaym-config.mjs
-          node --check /tmp/tekaym-prison.mjs
+          node --check /tmp/tekaym-voxel-world.mjs
       - name: Check client structure
         run: |
           test -f index.html
           test -f release.json
           test -f src/main.js
           test -f src/config.js
-          test -f src/prison.js
+          test -f src/voxel-world.js
           test -f worker/src/index.js
           test -f worker/wrangler.jsonc
           test -f firestore.rules
           echo 'Tekaym structure OK'
+      - name: Validate voxel world and personal rooms
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          const checks=[
+            [((main.includes("createVoxelWorld(scene)")||main.includes("createVoxelWorld(scene,worldSeed)"))||main.includes("createVoxelWorld(scene,worldSeed)")),'Voxel world is not integrated into the client'],
+            [main.includes("voxelWorld.breakBlock(camera)"),'Mining action missing'],
+            [main.includes("voxelWorld.placeBlock(camera"),'Block placement missing'],
+            [main.includes("voxelWorld.resetChanges("),'Room-switch reset missing'],
+            [main.includes("navigator.clipboard.writeText(activeRoomCode)"),'Invite-code copy action missing'],
+            [voxel.includes("serializeChanges")&&voxel.includes("resetChanges"),'Voxel save/reset API missing'],
+            [voxel.includes("RENDER_DISTANCE")&&voxel.includes("updateStreaming"),'Dynamic chunk streaming missing'],
+            [voxel.includes("function unloadChunkData")&&voxel.includes("blocks.delete(key(x, y, z))"),'Chunk data unloading missing'],
+            [voxel.includes('COAL_ORE')&&voxel.includes('IRON_ORE')&&voxel.includes('DIAMOND_ORE'),'Survival ore generation missing'],
+            [voxel.includes('safeSpawn: findSafeSpawn')&&voxel.includes('function findSafeSpawn')&&voxel.includes('return new THREE.Vector3(x + 0.5, top + 2.65, z + 0.5)'),'Safe spawn selection missing'],
+            [voxel.includes('naturalTop); y >= 0; y--'),'Ground height must not snap the player onto tree canopies'],
+            [main.includes('function craftIronSword')&&main.includes('function craftIronAxe')&&main.includes('function craftIronShovel'),'Iron tool recipes missing'],
+            [main.includes('function updateDayCycle')&&main.includes('function makeAnimal')&&main.includes('function eatFood'),'Day cycle, animals, and food survival missing'],
+            [main.includes('sunMesh')&&main.includes('moonMesh')&&main.includes('starField.visible=nowNight'),'Sun, moon, and night stars missing'],
+            [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchEat"'),'Day-night HUD and mobile eating missing'],
+            [worker.includes('worldClock: this.worldClock')&&worker.includes("storage.put('worldClock', this.worldClock)"),'Shared persistent world clock missing'],
+            [worker.includes('if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;')&&worker.includes('this.zombieSpawnNear(target)'),'Hostile mobs must only move at night and spawn near players'],
+            [main.includes("best.userData.type==='cow'")&&main.includes('inventory.rawBeef')&&main.includes('inventory.leather'),'Animal meat and drops missing'],
+            [main.includes("if(Array.isArray(m.animals))")&&main.includes("a.userData.networked=true")&&main.includes("type:'animal_attack'")&&main.includes("m.type==='animal_killed'"),'Shared animal rendering, hunting, or rewards missing'],
+            [worker.includes("this.animals = await this.ctx.storage.get('animals')")&&worker.includes("storage.put('animals', this.animals)")&&worker.includes("animals: this.animals.map"),'Persistent shared animal state missing'],
+            [worker.includes("msg.type === 'animal_attack'")&&worker.includes("this.ensureAnimalsNearPlayers()")&&(worker.includes("this.moveAnimals(elapsed)")||worker.includes("this.moveAnimals(realElapsed || 1)")),'Server animal AI and hunting validation missing'],
+            [worker.includes("function animalDrops(type)")&&worker.includes("rawBeef: 2")&&worker.includes("rawPork: 2")&&worker.includes("rawChicken: 1"),'Server-authoritative animal drops missing'],
+            [main.includes('function craftShovel')&&main.includes('function craftSword')&&main.includes('function craftStonePickaxe')&&main.includes('function craftIronPickaxe'),'Tool progression recipes missing'],
+            [main.includes('function smeltIron')&&main.includes('function hasStation'),'Furnace and crafting station progression missing'],
+            [main.includes("keys.shift")&&html.includes('id="touchRun"'),'Sprint controls missing'],
+            [main.includes("voxelWorld.updateStreaming(controls.object.position)"),'Player movement does not stream chunks'],
+            [worker.includes("url.pathname === '/rooms/create'"),'Room-code creation route missing'],
+            [worker.includes("msg.type === 'block_edit'"),'Server block synchronization missing'],
+            [worker.includes('y > 47')&&worker.includes('id > 14'),'Expanded terrain and ore block sync bounds missing'],
+            [worker.includes("weapon === 'ironSword'")&&worker.includes("weapon === 'stoneAxe'"),'Multiplayer weapon tiers missing'],
+            [worker.includes("Keep AIR edits as tombstones"),'Broken-block persistence missing'],
+            [html.includes('id="createWorldButton"')&&html.includes('id="joinWorldButton"'),'World create/join controls missing'],
+            [html.includes('id="touchMine"')&&html.includes('id="touchPlace"'),'Mobile block controls missing']
+          ];
+          for(const [ok,message] of checks)if(!ok)throw new Error(message);
+          console.log('Voxel world and personal-room integration OK');
+          NODE
       - name: Validate isolated demo modules
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const demos = [
-            {file:'recursos-prueba/demo-jugable/index.html', output:'/tmp/tekaym-playable.mjs', label:'playable', ids:['play','attackButton','stickBase','game']},
             {file:'recursos-prueba/demo-animaciones/index.html', output:'/tmp/tekaym-animation-lab.mjs', label:'animation lab', ids:['character','environment','speed','front','side']}
           ];
           for (const demo of demos) {
@@ -67,34 +112,6 @@ jobs:
             fs.writeFileSync(demo.output, html.slice(start + tag.length, end));
             console.log('Structure OK: '+demo.label);
           }
-          NODE
-          node --check /tmp/tekaym-playable.mjs
-      - name: Validate playable demo spawn and wake-up camera
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const html = fs.readFileSync('recursos-prueba/demo-jugable/index.html', 'utf8');
-          if (!html.includes('player.x=13.35;player.z=11.35;')) throw new Error('Spawn point changed unexpectedly');
-          if (!html.includes('camera.position.set(13,.96,11)')) throw new Error('Intro camera is not reset at the spawn');
-          if (!html.includes('camera.lookAt(13,.96,10)')) throw new Error('Spawn camera must look through the side-mounted gate');
-          if (!html.includes('spawnGrace=4.0;')) throw new Error('Spawn movement grace regression');
-          if (!html.includes("base.addEventListener('pointermove',e=>{if(e.pointerId===stickId)moveStick(e);});")) throw new Error('Touch joystick pointer movement handler missing');
-          if (!html.includes("base.addEventListener('lostpointercapture',resetStick);")) throw new Error('Touch joystick pointer release recovery missing');
-          if (!html.includes('joyX=0;joyY=0;lookPointer=null;for(const k in keys)keys[k]=false;stickId=null;')) throw new Error('Respawn must clear stale input state');
-          if (!html.includes("window.addEventListener('pointercancel',e=>{if(e.pointerId===stickId)resetStick();if(e.pointerId===lookPointer)lookPointer=null;});")) throw new Error('Global touch cancellation recovery missing');
-          if (!html.includes('cameraYaw=-Math.PI/2;')) throw new Error('Camera must face the side-mounted cell gate');
-          if (!html.includes('cameraYaw=(-Math.PI/2)*rise;')) throw new Error('Intro camera yaw animation missing');
-          if (html.includes('id="map"') || html.includes('updateMap();')) throw new Error('Minimap must be removed and must not break the render loop');
-          if (!html.includes('const camY=(openingSequence>0?.96+.66*rise:1.62)+player.y')) throw new Error('Intro camera height regression');
-          if (!html.includes('const pitch=openingSequence>0?-.035*(1-rise)+.03*rise:cameraPitch')) throw new Error('Intro camera pitch regression');
-          if (!html.includes('openingSequence=4.8;roundHasStarted=false;')) throw new Error('Wake-up sequence must not leave controls locked too long');
-          if (!html.includes('open:true,openAmount:1,sequenceIndex:cellGates.length')) throw new Error('Cell gates must start open for the prison spawn');
-          if (!html.includes('if(c.cellRef&&c.cellRef.open)continue;')) throw new Error('Opened cell gate collision handling missing');
-          const x = 13.35, z = 11.35, cx = 13, cz = 11, halfW = 5.15 / 2, halfD = 6.4 / 2, radius = .34;
-          if (x <= cx-halfW+radius || x >= cx+halfW-radius || z <= cz-halfD+radius || z >= cz+halfD-radius) {
-            throw new Error('Spawn point is not safely inside the player cell');
-          }
-          console.log('Playable demo spawn, camera, and gate regression checks passed');
           NODE
           node --check /tmp/tekaym-animation-lab.mjs
       - name: Check isolation
@@ -114,4 +131,59 @@ jobs:
           if(!cfg.includes("GAME_VERSION='V1'"))throw new Error('Client config version missing');
           if(!r.clientPath.includes('/index.html'))throw new Error('Client path invalid');
           console.log('Version synchronization OK -> '+r.version);
+          NODE
+
+      - name: Validate survival cooking, torches, and Android packaging
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const worker=fs.readFileSync('worker/src/index.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          if(!main.includes('function cookMeat()')||!main.includes('furnaceQueue.push')||!main.includes('function updateFurnace(dt)'))throw new Error('Timed meat cooking missing');
+          if(!main.includes('function consumeFurnaceFuel()')||!main.includes('inventory.furnaceFuel=8'))throw new Error('Coal fuel must process eight items');
+          if(!main.includes('cookedBeef')||!main.includes('player.hunger+(cooked?55:28)'))throw new Error('Cooked food hunger benefit missing');
+          if(!main.includes('function syncTorchLights()')||!main.includes('function isTorchProtected'))throw new Error('Torch lighting or spawn protection missing');
+          if(!voxel.includes('TORCH: 14')||!voxel.includes("14:'Antorcha'")||!voxel.includes('Coal appears in small connected veins'))throw new Error('Torch block or coal veins missing');
+          if(!worker.includes('isTorchProtected(x, z)')||!worker.includes('block.id > 14'))throw new Error('Multiplayer torch support missing');
+          if(!html.includes('id="cookMeat"')||!html.includes('id="craftTorch"')||!html.includes('id="audioToggle"'))throw new Error('Survival controls missing');
+          if(!fs.existsSync('capacitor.config.json')||!fs.existsSync('.github/workflows/build-android-apk.yml'))throw new Error('Android APK workflow/config missing');
+          console.log('Survival systems and Android packaging checks passed');
+          NODE
+
+      - name: Validate menu, movement, inventory, hotbar and bare hands
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'); const m=fs.readFileSync('src/main.js','utf8'); const h=fs.readFileSync('index.html','utf8'); const v=fs.readFileSync('src/voxel-world.js','utf8');
+          if(!m.includes('function setKey(e,down)'))throw new Error('Keyboard movement mapping missing');
+          if(!m.includes('function beginLocalWorld(isNew)')||!h.includes('id="newLocalWorldButton"'))throw new Error('World menu missing');
+          if(!m.includes('RECIPES.filter(canCraftRecipe)'))throw new Error('Material-filtered recipes missing');
+          if(!m.includes('function renderHotbar()')||!h.includes('id="hotbar"'))throw new Error('Hotbar missing');
+          if(!m.includes('MANOS VACÍAS'))throw new Error('Empty-hand start is missing');
+          if(!m.includes("e.code.startsWith('Digit')")||!m.includes("e.code==='KeyE'"))throw new Error('Inventory/hotbar keyboard controls missing');
+          if(!v.includes('createVoxelWorld(scene, seedValue=7919)'))throw new Error('World seeds missing');
+          if(!h.includes('id="inventoryModal"')||!h.includes('id="recipeList"'))throw new Error('Inventory UI missing');
+          console.log('Menu, movement, inventory, crafting, hotbar and empty-hand checks passed');
+          NODE
+
+      - name: Validate landscape mobile controls and pixel-art blocks
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const apk=fs.readFileSync('.github/workflows/build-android-apk.yml','utf8');
+          const checks=[
+            [main.includes("screen.orientation.lock('landscape')"),'Browser landscape lock fallback missing'],
+            [main.includes("navigator.maxTouchPoints>0")&&main.includes("const yaw=camera.rotation.y")&&!main.includes("controls.object.rotation.y+(isTouchDevice?camera.rotation.y:0)"),'Touch-device detection or camera-aligned movement missing'],
+            [main.includes('function jumpPlayer()')&&main.includes('player.jumpVelocity-=18*dt')&&main.includes("e.code==='Space'")&&html.includes('id="touchJump"'),'Keyboard/mobile jump physics missing'],
+            [main.includes("lookYaw-=dx*.006")&&main.includes("move.addEventListener('pointercancel',resetMove)")&&main.includes("look.addEventListener('pointercancel',resetLook)"),'Touch camera delta or pointer cancellation recovery missing'],
+            [html.includes("@media(pointer:coarse){#touch{display:block!important}"),'Touch HUD may disappear on a landscape phone'],
+            [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
+            [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation']
+          ];
+          for(const [ok,message] of checks)if(!ok)throw new Error(message);
+          console.log('Landscape mobile controls and pixel-art block checks passed');
           NODE

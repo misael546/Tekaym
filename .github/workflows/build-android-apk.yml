@@ -1,0 +1,56 @@
+name: Build signed Android test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [voxel-world-foundation]
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: npm install
+      - name: Prepare web assets
+        run: npm run build:web
+      - name: Generate Android project
+        run: npx cap add android
+      - name: Lock Android game orientation to landscape
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'android/app/src/main/AndroidManifest.xml';
+          let xml = fs.readFileSync(path, 'utf8');
+          const activity = /<activity\b[^>]*android:name="\.MainActivity"[^>]*>/s;
+          const match = xml.match(activity);
+          if (!match) throw new Error('Capacitor MainActivity not found in AndroidManifest.xml');
+          let tag = match[0];
+          if (/android:screenOrientation="[^"]+"/.test(tag)) tag = tag.replace(/android:screenOrientation="[^"]+"/, 'android:screenOrientation="landscape"');
+          else tag = tag.replace(/>$/, ' android:screenOrientation="landscape">');
+          xml = xml.replace(activity, tag);
+          fs.writeFileSync(path, xml);
+          if (!xml.includes('android:screenOrientation="landscape"')) throw new Error('Landscape orientation was not applied');
+          console.log('Android activity locked to landscape');
+          NODE
+      - name: Sync Android assets
+        run: npx cap sync android
+      - name: Build debug-signed APK
+        run: cd android && ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tekaym-online-android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

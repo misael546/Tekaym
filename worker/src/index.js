@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const MAX_PLAYERS = 16;
 const MAX_ZOMBIES = 18;
-const WORLD = { minX: -108, maxX: 108, minZ: -88, maxZ: 88 };
+const WORLD = { minX: -100000, maxX: 100000, minZ: -100000, maxZ: 100000 };
 const MOVE_SPEED_LIMIT = 4.8;
 const ATTACK_COOLDOWN_MS = 520;
 const PLAYER_SAVE_MS = 120000;
@@ -157,8 +157,8 @@ function isInsideCell(x, z, margin = 0) {
 function randomCellSpawn() { return CELLS[Math.floor(Math.random() * CELLS.length)]; }
 function randomZombieSpot() {
   for (let attempt = 0; attempt < 250; attempt++) {
-    const x = (Math.random() * 2 - 1) * 96;
-    const z = (Math.random() * 2 - 1) * 78;
+    const x = (Math.random() * 2 - 1) * 54;
+    const z = (Math.random() * 2 - 1) * 54;
     if (!isInsideCell(x, z, -0.1)) return { x, z };
   }
   return { x: 0, z: 0 };
@@ -170,6 +170,28 @@ function createZombies() {
   });
 }
 
+const MAX_ANIMALS = 10;
+const ANIMAL_TYPES = ['chicken', 'pig', 'cow'];
+function randomAnimalSpot(player, min = 8, max = 26) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = min + Math.random() * (max - min);
+    const x = clamp(Math.round(player.x + Math.cos(angle) * distance), WORLD.minX, WORLD.maxX);
+    const z = clamp(Math.round(player.z + Math.sin(angle) * distance), WORLD.minZ, WORLD.maxZ);
+    if (!isInsideCell(x, z, -0.1)) return { x, z };
+  }
+  return { x: clamp(player.x + min, WORLD.minX, WORLD.maxX), z: clamp(player.z, WORLD.minZ, WORLD.maxZ) };
+}
+function createAnimal(type, player) {
+  const pos = randomAnimalSpot(player);
+  return { id: 'animal-' + uid(), type, x: pos.x, z: pos.z, hp: 20, maxHp: 20, speed: type === 'chicken' ? 0.58 : 0.34, dir: Math.random() * Math.PI * 2, turnAt: Date.now() + 2000 + Math.random() * 4000, respawnAt: 0 };
+}
+function animalDrops(type) {
+  if (type === 'cow') return { rawBeef: 2, ...(Math.random() < 0.7 ? { leather: 1 } : {}) };
+  if (type === 'pig') return { rawPork: 2 };
+  return { rawChicken: 1, ...(Math.random() < 0.75 ? { feathers: 1 } : {}) };
+}
+
 export class GameRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -177,8 +199,12 @@ export class GameRoom extends DurableObject {
     this.env = env;
     this.sessions = new Map();
     this.zombies = [];
+    this.animals = [];
+    this.blocks = new Map();
+    this.roomOwnerSub = '';
     this.initialized = false;
     this.lastWorldTick = Date.now();
+    this.worldClock = 0;
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment();
       if (attachment && attachment.id) this.sessions.set(attachment.id, { ...attachment, ws });
@@ -189,6 +215,19 @@ export class GameRoom extends DurableObject {
     if (this.initialized) return;
     this.initialized = true;
     this.zombies = await this.ctx.storage.get('zombies');
+    this.animals = await this.ctx.storage.get('animals');
+    if (!Array.isArray(this.animals)) this.animals = [];
+    const savedWorldClock = await this.ctx.storage.get('worldClock');
+    this.worldClock = Number.isFinite(Number(savedWorldClock)) ? ((Number(savedWorldClock) % 1200) + 1200) % 1200 : 0;
+    this.roomOwnerSub = String(await this.ctx.storage.get('roomOwnerSub') || '');
+    const savedBlocks = await this.ctx.storage.get('blocks');
+    if (Array.isArray(savedBlocks)) {
+      for (const block of savedBlocks) {
+        if (!block || !Number.isInteger(block.x) || !Number.isInteger(block.y) || !Number.isInteger(block.z) || !Number.isInteger(block.id)) continue;
+        if (Math.abs(block.x) > 100000 || Math.abs(block.z) > 100000 || block.y < 0 || block.y > 47 || block.id < 0 || block.id > 14) continue;
+        this.blocks.set(block.x + ',' + block.y + ',' + block.z, block);
+      }
+    }
     if (!Array.isArray(this.zombies) || !this.zombies.length) {
       this.zombies = createZombies();
       await this.ctx.storage.put('zombies', this.zombies);
@@ -205,7 +244,7 @@ export class GameRoom extends DurableObject {
     if (this.sessions.size >= MAX_PLAYERS) return json({ ok: false, error: 'Servidor lleno', maxPlayers: MAX_PLAYERS }, 503);
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
-    const cell = randomCellSpawn();
+    const cell = { x: Math.round((Math.random() * 12 - 6) * 10) / 10, z: Math.round((Math.random() * 12 - 6) * 10) / 10, id: 'MUNDO' };
     const session = {
       id: uid(), name: 'Jugador', googleSub: '', email: '',
       x: cell.x, z: cell.z, cellId: cell.id,
@@ -258,23 +297,49 @@ export class GameRoom extends DurableObject {
     if (session.hunger <= 0 || session.thirst <= 0) session.hp = clamp(session.hp - elapsed * 0.8, 0, session.maxHp);
   }
 
+  isTorchProtected(x, z) {
+    for (const block of this.blocks.values()) {
+      if (block.id === 14 && Math.abs(x - block.x) + Math.abs(z - block.z) <= 11) return true;
+    }
+    return false;
+  }
+
+  zombieSpawnNear(player) {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 24 + Math.random() * 8;
+      const x = clamp(player.x + Math.cos(angle) * distance, WORLD.minX, WORLD.maxX);
+      const z = clamp(player.z + Math.sin(angle) * distance, WORLD.minZ, WORLD.maxZ);
+      if (!this.isTorchProtected(x, z) && !isInsideCell(x, z, 0)) return { x, z };
+    }
+    return randomZombieSpot();
+  }
+
   moveZombies(dt) {
+    if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;
     const step = clamp(dt, 0, 0.75);
     for (const zombie of this.zombies) {
       if (zombie.hp <= 0) {
         if (zombie.respawnAt && Date.now() >= zombie.respawnAt) {
-          const pos = randomZombieSpot();
+          const players = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+          const target = players.length ? players[Math.floor(Math.random() * players.length)] : null;
+          const pos = target ? this.zombieSpawnNear(target) : randomZombieSpot();
           zombie.x = pos.x; zombie.z = pos.z; zombie.hp = zombie.maxHp; zombie.respawnAt = 0;
         }
         continue;
       }
-      let target = null, best = 20;
+      let target = null, best = Infinity;
       for (const player of this.sessions.values()) {
         if (!player.joined || player.hp <= 0) continue;
         const d = Math.hypot(player.x - zombie.x, player.z - zombie.z);
         if (d < best) { best = d; target = player; }
       }
       if (!target) continue;
+      if (best > 28) {
+        const pos = this.zombieSpawnNear(target);
+        zombie.x = pos.x; zombie.z = pos.z;
+        continue;
+      }
       const dx = target.x - zombie.x, dz = target.z - zombie.z;
       const length = Math.max(0.001, Math.hypot(dx, dz));
       const distance = Math.min(zombie.speed * step, length);
@@ -288,14 +353,59 @@ export class GameRoom extends DurableObject {
     }
   }
 
+  ensureAnimalsNearPlayers() {
+    if (!(this.worldClock < 650 || this.worldClock >= 1150)) return;
+    const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+    if (!active.length) return;
+    while (this.animals.length < MAX_ANIMALS) {
+      const player = active[Math.floor(Math.random() * active.length)];
+      const type = ANIMAL_TYPES[Math.floor(Math.random() * ANIMAL_TYPES.length)];
+      this.animals.push(createAnimal(type, player));
+    }
+  }
+
+  moveAnimals(dt) {
+    const active = [...this.sessions.values()].filter(p => p.joined && p.hp > 0);
+    if (!active.length) return;
+    const now = Date.now(), step = clamp(dt, 0, 5);
+    const daylight = this.worldClock < 650 || this.worldClock >= 1150;
+    if (daylight) this.ensureAnimalsNearPlayers();
+    for (const animal of this.animals) {
+      if (animal.hp <= 0) {
+        if (animal.respawnAt && now >= animal.respawnAt && daylight) {
+          const player = active[Math.floor(Math.random() * active.length)];
+          const pos = randomAnimalSpot(player);
+          animal.x = pos.x; animal.z = pos.z; animal.hp = animal.maxHp; animal.respawnAt = 0;
+          animal.dir = Math.random() * Math.PI * 2; animal.turnAt = now + 2000 + Math.random() * 4000;
+        }
+        continue;
+      }
+      if (now >= Number(animal.turnAt || 0)) {
+        animal.dir = Math.random() * Math.PI * 2;
+        animal.turnAt = now + 2000 + Math.random() * 4000;
+      }
+      const speed = Number(animal.speed) || 0.34;
+      const nx = clamp(animal.x + Math.sin(animal.dir) * speed * step, WORLD.minX, WORLD.maxX);
+      const nz = clamp(animal.z + Math.cos(animal.dir) * speed * step, WORLD.minZ, WORLD.maxZ);
+      if (!isInsideCell(nx, nz, 0)) { animal.x = nx; animal.z = nz; }
+      const nearest = Math.min(...active.map(p => Math.hypot(p.x - animal.x, p.z - animal.z)));
+      if (nearest > 62) {
+        animal.hp = 0;
+        animal.respawnAt = now + 5000;
+      }
+    }
+  }
+
   statePayload() {
     return {
       type: 'state',
+      worldClock: this.worldClock,
       players: [...this.sessions.values()].filter(p => p.joined).map(p => ({
         id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp,
         stamina: p.stamina, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId
       })),
-      zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp }))
+      zombies: this.zombies.map(z => ({ id: z.id, x: z.x, z: z.z, hp: z.hp, maxHp: z.maxHp })),
+      animals: this.animals.map(a => ({ id: a.id, type: a.type, x: a.x, z: a.z, hp: a.hp, maxHp: a.maxHp }))
     };
   }
 
@@ -310,9 +420,17 @@ export class GameRoom extends DurableObject {
     try { msg = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message)); } catch { return; }
 
     if (msg.type === 'join') {
-      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } }); return; }
+      if (p.joined) { this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, blocks: [...this.blocks.values()], worldClock: this.worldClock }); return; }
       try {
         const google = await verifyGoogle(String(msg.googleIdToken || ''), this.env);
+        if (this.roomOwnerSub && google.sub !== this.roomOwnerSub && ![...this.sessions.values()].some(s => s.joined && s.googleSub === this.roomOwnerSub)) {
+          this.send(ws, { type: 'room_closed', message: 'El anfitrión no está conectado a este mundo.' });
+          return;
+        }
+        if (!this.roomOwnerSub) {
+          this.roomOwnerSub = google.sub;
+          await this.ctx.storage.put('roomOwnerSub', google.sub);
+        }
         await ensureAccount(this.env, google);
         const saved = await loadPlayer(this.env, google.sub);
         p.googleSub = google.sub;
@@ -329,7 +447,9 @@ export class GameRoom extends DurableObject {
         p.joined = true;
         await savePlayer(this.env, google.sub, this.playerSaveData(p));
         this.persistSession(ws, p);
-        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId } });
+        this.ensureAnimalsNearPlayers();
+        await this.ctx.storage.put('animals', this.animals);
+        this.send(ws, { type: 'joined', player: { id: p.id, name: p.name, x: p.x, z: p.z, hp: p.hp, maxHp: p.maxHp, hunger: p.hunger, thirst: p.thirst, cellId: p.cellId }, worldClock: this.worldClock });
         this.broadcastState();
       } catch (error) {
         this.send(ws, { type: 'auth_error', message: error && error.message ? error.message : 'Autenticación inválida.' });
@@ -349,6 +469,7 @@ export class GameRoom extends DurableObject {
         const nextZ = clamp(p.z + dz * ratio, WORLD.minZ, WORLD.maxZ);
         p.x = nextX; p.z = nextZ; p.lastMove = now;
         this.moveZombies(elapsed);
+        this.moveAnimals(elapsed);
         this.persistSession(ws, p);
         this.broadcastState();
       }
@@ -361,11 +482,42 @@ export class GameRoom extends DurableObject {
       if (!zombie || zombie.hp <= 0) return;
       if (Math.hypot(p.x - zombie.x, p.z - zombie.z) > 2.65) return;
       p.lastAttack = now;
-      zombie.hp = Math.max(0, zombie.hp - 20);
+      const weapon = ['knife','sword','stoneSword','ironSword','axe','stoneAxe','ironAxe'].includes(msg.weapon) ? msg.weapon : 'knife';
+      const damage = weapon === 'ironSword' ? 60 : weapon === 'stoneSword' ? 45 : weapon === 'sword' ? 30 : weapon === 'ironAxe' ? 40 : weapon === 'stoneAxe' ? 35 : weapon === 'axe' ? 28 : 20;
+      zombie.hp = Math.max(0, zombie.hp - damage);
       if (zombie.hp <= 0) zombie.respawnAt = now + 6000;
       this.persistSession(ws, p);
       this.broadcastState();
-      this.send(ws, { type: 'attack_ack', targetId: zombie.id, damage: 20, zombieHp: zombie.hp });
+      this.send(ws, { type: 'attack_ack', targetId: zombie.id, damage, zombieHp: zombie.hp });
+      return;
+    }
+    if (msg.type === 'animal_attack') {
+      if (now - Number(p.lastAttack || 0) < ATTACK_COOLDOWN_MS) return;
+      const targetId = safeText(msg.targetId, 48);
+      const animal = this.animals.find(a => a.id === targetId);
+      if (!animal || animal.hp <= 0 || !ANIMAL_TYPES.includes(animal.type)) return;
+      if (Math.hypot(p.x - animal.x, p.z - animal.z) > 2.8) return;
+      p.lastAttack = now;
+      const weapon = ['knife','sword','stoneSword','ironSword','axe','stoneAxe','ironAxe'].includes(msg.weapon) ? msg.weapon : 'knife';
+      const damage = weapon === 'ironSword' ? 60 : weapon === 'stoneSword' ? 45 : weapon === 'sword' ? 30 : weapon === 'ironAxe' ? 40 : weapon === 'stoneAxe' ? 35 : weapon === 'axe' ? 28 : 20;
+      animal.hp = Math.max(0, animal.hp - damage);
+      if (animal.hp <= 0) {
+        animal.respawnAt = now + 45000 + Math.floor(Math.random() * 30000);
+        this.send(ws, { type: 'animal_killed', targetId: animal.id, animalType: animal.type, drops: animalDrops(animal.type) });
+      }
+      await this.ctx.storage.put('animals', this.animals);
+      this.broadcastState();
+      return;
+    }
+    if (msg.type === 'block_edit') {
+      const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z), id = Number(msg.id);
+      if (![x, y, z, id].every(Number.isInteger) || Math.abs(x) > 100000 || Math.abs(z) > 100000 || y < 0 || y > 47 || id < 0 || id > 14) return;
+      if (Math.hypot(p.x - x, p.z - z) > 7) return;
+      const key = x + ',' + y + ',' + z;
+      // Keep AIR edits as tombstones so generated terrain stays broken for later visitors.
+      this.blocks.set(key, { x, y, z, id });
+      await this.ctx.storage.put('blocks', [...this.blocks.values()]);
+      this.broadcast({ type: 'block_edit', x, y, z, id });
       return;
     }
     if (msg.type === 'chat') {
@@ -382,6 +534,13 @@ export class GameRoom extends DurableObject {
     const p = this.refreshSession(ws);
     if (p && p.joined) {
       try { await savePlayer(this.env, p.googleSub, this.playerSaveData(p)); } catch (error) { console.error('[TEKAYM SAVE ON CLOSE]', error?.message || error); }
+      if (p.googleSub && p.googleSub === this.roomOwnerSub) {
+        for (const other of [...this.sessions.values()]) {
+          if (other.id === p.id) continue;
+          this.sessions.delete(other.id);
+          try { other.ws.close(1001, 'El anfitrión salió del mundo'); } catch {}
+        }
+      }
       this.sessions.delete(p.id);
     } else if (p) this.sessions.delete(p.id);
     this.broadcastState();
@@ -389,6 +548,13 @@ export class GameRoom extends DurableObject {
 
   async webSocketError(ws) {
     const p = this.refreshSession(ws);
+    if (p && p.googleSub && p.googleSub === this.roomOwnerSub) {
+      for (const other of [...this.sessions.values()]) {
+        if (other.id === p.id) continue;
+        this.sessions.delete(other.id);
+        try { other.ws.close(1001, 'El anfitrión perdió la conexión'); } catch {}
+      }
+    }
     if (p) this.sessions.delete(p.id);
     this.broadcastState();
   }
@@ -396,7 +562,8 @@ export class GameRoom extends DurableObject {
   async alarm() {
     await this.load();
     const now = Date.now();
-    const elapsed = clamp((now - this.lastWorldTick) / 1000, 0, 5);
+    const realElapsed = clamp((now - this.lastWorldTick) / 1000, 0, 30);
+    const elapsed = clamp(realElapsed, 0, 5);
     this.lastWorldTick = now;
     for (const p of this.sessions.values()) {
       this.updateNeeds(p, now);
@@ -407,7 +574,11 @@ export class GameRoom extends DurableObject {
       if (p.ws) this.persistSession(p.ws, p);
     }
     this.moveZombies(elapsed || 1);
+    this.worldClock = (this.worldClock + (realElapsed || 1)) % 1200;
+    this.moveAnimals(realElapsed || 1);
+    await this.ctx.storage.put('worldClock', this.worldClock);
     await this.ctx.storage.put('zombies', this.zombies);
+    await this.ctx.storage.put('animals', this.animals);
     if (this.sessions.size) this.broadcastState();
     await this.ctx.storage.setAlarm(Date.now() + ALARM_MS);
   }
@@ -421,13 +592,21 @@ export default {
       return json({ ok: true, game: 'Tekaym Online', version: env.GAME_VERSION || 'V1', status: 'online', maxPlayers: MAX_PLAYERS, server: 'cloudflare-durable-object', googleConfigured: Boolean(env.GOOGLE_CLIENT_ID), firebaseConfigured: Boolean(env.FIREBASE_PROJECT_ID && env.FIREBASE_SERVICE_ACCOUNT_JSON) });
     }
     if (url.pathname === '/auth/google/config') return json({ ok: Boolean(env.GOOGLE_CLIENT_ID), clientId: String(env.GOOGLE_CLIENT_ID || '') });
+    if (url.pathname === '/rooms/create') {
+      const code = crypto.randomUUID().replaceAll('-', '').slice(0, 6).toUpperCase();
+      return json({ ok: true, code, hostMode: 'while-online' });
+    }
     if (url.pathname === '/rooms') {
-      const id = env.GAME_ROOMS.idFromName('main');
+      const code = String(url.searchParams.get('code') || 'main').toUpperCase();
+      if (code !== 'MAIN' && !/^[A-F0-9]{6}$/.test(code)) return json({ ok: false, error: 'Código de mundo inválido' }, 400);
+      const id = env.GAME_ROOMS.idFromName('world:' + code);
       return env.GAME_ROOMS.get(id).fetch(new Request(new URL('/rooms', url), request));
     }
     if (url.pathname === '/ws') {
       if (request.headers.get('Upgrade') !== 'websocket') return json({ ok: false, error: 'WebSocket upgrade requerido' }, 426);
-      const id = env.GAME_ROOMS.idFromName('main');
+      const code = String(url.searchParams.get('room') || 'main').toUpperCase();
+      if (code !== 'MAIN' && !/^[A-F0-9]{6}$/.test(code)) return json({ ok: false, error: 'Código de mundo inválido' }, 400);
+      const id = env.GAME_ROOMS.idFromName('world:' + code);
       return env.GAME_ROOMS.get(id).fetch(request);
     }
     return json({ ok: false, error: 'Not Found' }, 404);
