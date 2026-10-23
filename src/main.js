@@ -135,7 +135,7 @@ function craftAxe(){craftRecipe({[BLOCK.PLANKS]:3,sticks:2},'axe',1,'Hacha de ma
 function craftShovel(){craftRecipe({[BLOCK.PLANKS]:1,sticks:2},'shovel',1,'Pala de madera');}
 function craftSword(){craftRecipe({[BLOCK.PLANKS]:2,sticks:1},'sword',1,'Espada de madera');}
 function craftTable(){craftRecipe({[BLOCK.PLANKS]:4},BLOCK.CRAFTING_TABLE,1,'Mesa de trabajo');}
-function hasStation(id){if((inventory[id]||0)>0)return true;const px=Math.floor(controls.object.position.x),pz=Math.floor(controls.object.position.z),py=Math.floor(controls.object.position.y-1.65);for(let x=px-4;x<=px+4;x++)for(let z=pz-4;z<=pz+4;z++)for(let y=Math.max(0,py-2);y<=py+2;y++)if(voxelWorld.getBlock(x,y,z)===id)return true;return false;}
+function hasStation(id){const px=Math.floor(controls.object.position.x),pz=Math.floor(controls.object.position.z),py=Math.floor(controls.object.position.y-1.65);for(let x=px-4;x<=px+4;x++)for(let z=pz-4;z<=pz+4;z++)for(let y=Math.max(0,py-2);y<=py+2;y++)if(voxelWorld.getBlock(x,y,z)===id)return true;return false;}
 function craftStonePickaxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo en tu inventario o colocada cerca.';return;}craftRecipe({3:3,sticks:2},'stonePickaxe',1,'Pico de piedra');}
 function craftStoneAxe(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:3,sticks:2},'stoneAxe',1,'Hacha de piedra');}
 function craftStoneSword(){if(!hasStation(BLOCK.CRAFTING_TABLE)){hint.textContent='Necesitas una mesa de trabajo cerca.';return;}craftRecipe({3:2,sticks:1},'stoneSword',1,'Espada de piedra');}
