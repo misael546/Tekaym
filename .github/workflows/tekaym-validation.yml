@@ -79,7 +79,7 @@ jobs:
             [main.includes("best.userData.type==='cow'")&&main.includes('inventory.rawBeef')&&main.includes('inventory.leather'),'Animal meat and drops missing'],
             [main.includes("if(Array.isArray(m.animals))")&&main.includes("a.userData.networked=true")&&main.includes("type:'animal_attack'")&&main.includes("m.type==='animal_killed'"),'Shared animal rendering, hunting, or rewards missing'],
             [worker.includes("this.animals = await this.ctx.storage.get('animals')")&&worker.includes("storage.put('animals', this.animals)")&&worker.includes("animals: this.animals.map"),'Persistent shared animal state missing'],
-            [worker.includes("msg.type === 'animal_attack'")&&worker.includes("this.ensureAnimalsNearPlayers()")&&worker.includes("this.moveAnimals(elapsed || 1)"),'Server animal AI and hunting validation missing'],
+            [worker.includes("msg.type === 'animal_attack'")&&worker.includes("this.ensureAnimalsNearPlayers()")&&(worker.includes("this.moveAnimals(elapsed)")||worker.includes("this.moveAnimals(realElapsed || 1)")),'Server animal AI and hunting validation missing'],
             [worker.includes("function animalDrops(type)")&&worker.includes("rawBeef: 2")&&worker.includes("rawPork: 2")&&worker.includes("rawChicken: 1"),'Server-authoritative animal drops missing'],
             [main.includes('function craftShovel')&&main.includes('function craftSword')&&main.includes('function craftStonePickaxe')&&main.includes('function craftIronPickaxe'),'Tool progression recipes missing'],
             [main.includes('function smeltIron')&&main.includes('function hasStation'),'Furnace and crafting station progression missing'],
