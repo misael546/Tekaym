@@ -248,7 +248,7 @@ export function createVoxelWorld(scene) {
     for (let y = MAX_Y - 1; y >= 0; y--) if (isSolid(getBlock(bx, y, bz))) { top = y; break; }
     for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
       ensureChunkData(chunkOf(bx + dx), chunkOf(bz + dz));
-      for (let y = top + 1; y <= top + 3; y++) {
+      for (let y = top + 1; y <= Math.min(MAX_Y - 1, top + 6); y++) {
         const k = key(bx + dx, y, bz + dz);
         if (getBlock(bx + dx, y, bz + dz)) { changes.set(k, BLOCK.AIR); putRaw(bx + dx, y, bz + dz, BLOCK.AIR); }
       }
@@ -258,7 +258,8 @@ export function createVoxelWorld(scene) {
   function getHeightAt(x, z) {
     ensureChunkData(chunkOf(x), chunkOf(z));
     const bx = Math.floor(x), bz = Math.floor(z);
-    for (let y = MAX_Y - 1; y >= 0; y--) {
+    const naturalTop = surfaceY(bx, bz);
+    for (let y = Math.min(MAX_Y - 1, naturalTop + 1); y >= 0; y--) {
       if (getBlock(bx, y, bz)) return y + 2.65;
     }
     return 1.65;
