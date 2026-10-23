@@ -283,7 +283,7 @@ export class GameRoom extends DurableObject {
         }
         continue;
       }
-      let target = null, best = 34;
+      let target = null, best = Infinity;
       for (const player of this.sessions.values()) {
         if (!player.joined || player.hp <= 0) continue;
         const d = Math.hypot(player.x - zombie.x, player.z - zombie.z);
