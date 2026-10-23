@@ -87,7 +87,7 @@ function loadRoomInventory(){
  updateInventoryHud();
 }
 function updateInventoryHud(){
- if(inventoryText)inventoryText.textContent='TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0)+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks;
+ if(inventoryText)inventoryText.textContent='PASTO '+(inventory[BLOCK.GRASS]||0)+' · TIERRA '+(inventory[BLOCK.DIRT]||0)+' · PIEDRA '+(inventory[BLOCK.STONE]||0)+' · ARENA '+(inventory[BLOCK.SAND]||0)+' · MADERA '+(inventory[BLOCK.WOOD]||0)+' · TABLAS '+inventory.planks+' · PALOS '+inventory.sticks+' · PICOS '+inventory.pickaxe+' · HACHAS '+inventory.axe;
  if(selectedText)selectedText.textContent='BLOQUE: '+voxelWorld.blockName(selectedBlock)+' ('+(inventory[selectedBlock]||0)+')';
 }
 function mineBlock(){
@@ -96,12 +96,12 @@ function mineBlock(){
  if(!hit)return;
  const id=voxelWorld.breakBlock(camera);
  if(!id)return;
- inventory[id]=(inventory[id]||0)+1;
+ inventory[id]=(inventory[id]||0)+((id===BLOCK.STONE&&inventory.pickaxe>0)||(id===BLOCK.WOOD&&inventory.axe>0)?2:1);
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  updateInventoryHud();saveWorld();
 }
 function placeSelectedBlock(){
- if(player.dead||(inventory[selectedBlock]||0)<1)return;
+ if(player.dead)return;if((inventory[selectedBlock]||0)<1){hint.textContent='No tienes '+voxelWorld.blockName(selectedBlock)+' para colocar.';return;}
  const hit=voxelWorld.targetFromCamera(camera);
  if(!hit)return;
  const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;
@@ -116,20 +116,20 @@ function selectNextBlock(){
  const at=Math.max(0,ids.indexOf(selectedBlock));selectedBlock=ids[(at+1)%ids.length];updateInventoryHud();saveWorld();
 }
 function craftPlanks(){
- if(inventory[BLOCK.WOOD]<1)return;
- inventory[BLOCK.WOOD]--;inventory.planks+=4;updateInventoryHud();saveWorld();
+ if(inventory[BLOCK.WOOD]<1){hint.textContent='Necesitas 1 bloque de madera para fabricar 4 tablas.';return;}
+ inventory[BLOCK.WOOD]--;inventory.planks+=4;hint.textContent='Fabricaste 4 tablas.';updateInventoryHud();saveWorld();
 }
 function craftSticks(){
- if(inventory.planks<2)return;
- inventory.planks-=2;inventory.sticks+=4;updateInventoryHud();saveWorld();
+ if(inventory.planks<2){hint.textContent='Necesitas 2 tablas para fabricar 4 palos.';return;}
+ inventory.planks-=2;inventory.sticks+=4;hint.textContent='Fabricaste 4 palos.';updateInventoryHud();saveWorld();
 }
 function craftPickaxe(){
- if(inventory.planks<3||inventory.sticks<2)return;
- inventory.planks-=3;inventory.sticks-=2;inventory.pickaxe++;updateInventoryHud();saveWorld();
+ if(inventory.planks<3||inventory.sticks<2){hint.textContent='Pico: necesitas 3 tablas y 2 palos.';return;}
+ inventory.planks-=3;inventory.sticks-=2;inventory.pickaxe++;hint.textContent='Fabricaste un pico: ahora obtienes más piedra.';updateInventoryHud();saveWorld();
 }
 function craftAxe(){
- if(inventory.planks<3||inventory.sticks<2)return;
- inventory.planks-=3;inventory.sticks-=2;inventory.axe++;updateInventoryHud();saveWorld();
+ if(inventory.planks<3||inventory.sticks<2){hint.textContent='Hacha: necesitas 3 tablas y 2 palos.';return;}
+ inventory.planks-=3;inventory.sticks-=2;inventory.axe++;hint.textContent='Fabricaste un hacha: ahora obtienes más madera y haces más daño local.';updateInventoryHud();saveWorld();
 }
 function attack(){
  if(player.dead||player.cooldown>0)return;
