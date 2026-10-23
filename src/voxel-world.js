@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 
 const CHUNK_SIZE = 16;
-const WORLD_CHUNKS = 8;
-const WORLD_SIZE = CHUNK_SIZE * WORLD_CHUNKS;
-const HALF_WORLD = WORLD_SIZE / 2;
+const RENDER_DISTANCE = 3;
 const MAX_Y = 28;
 const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6 });
 const COLORS = {
@@ -40,6 +38,7 @@ export function createVoxelWorld(scene) {
   group.name = 'TekaymVoxelWorld';
   const blocks = new Map();
   const chunks = new Map();
+  const dataChunks = new Set();
   const materials = new Map();
   const changes = new Map();
   const originals = new Map();
@@ -50,47 +49,86 @@ export function createVoxelWorld(scene) {
 
   function getBlock(x, y, z) {
     if (y < 0) return BLOCK.STONE;
-    return blocks.get(key(x, y, z)) || BLOCK.AIR;
+    const k = key(x, y, z);
+    if (changes.has(k)) return changes.get(k);
+    return blocks.get(k) || BLOCK.AIR;
   }
   function putRaw(x, y, z, id) {
-    if (x < -HALF_WORLD || x >= HALF_WORLD || z < -HALF_WORLD || z >= HALF_WORLD || y < 0 || y >= MAX_Y) return;
+    if (y < 0 || y >= MAX_Y) return;
     const k = key(x, y, z);
     if (id === BLOCK.AIR) blocks.delete(k);
     else blocks.set(k, id);
   }
   function surfaceY(x, z) { return terrainHeight(x, z); }
 
-  // Generate the initial terrain as voxel data, then render only exposed faces.
-  for (let x = -HALF_WORLD; x < HALF_WORLD; x++) {
-    for (let z = -HALF_WORLD; z < HALF_WORLD; z++) {
-      const top = surfaceY(x, z);
-      for (let y = 0; y <= top; y++) {
-        const id = y === top ? (top <= 4 ? BLOCK.SAND : BLOCK.GRASS) : y >= top - 3 ? BLOCK.DIRT : BLOCK.STONE;
-        putRaw(x, y, z, id);
+  function chunkOf(v) { return Math.floor(v / CHUNK_SIZE); }
+  function surfaceY(x, z) { return terrainHeight(x, z); }
+  function ensureChunkData(cx, cz) {
+    const ck = chunkKey(cx, cz);
+    if (dataChunks.has(ck)) return;
+    dataChunks.add(ck);
+    const startX = cx * CHUNK_SIZE, startZ = cz * CHUNK_SIZE;
+    for (let x = startX; x < startX + CHUNK_SIZE; x++) {
+      for (let z = startZ; z < startZ + CHUNK_SIZE; z++) {
+        const top = surfaceY(x, z);
+        for (let y = 0; y <= top; y++) {
+          const id = y === top ? (top <= 4 ? BLOCK.SAND : BLOCK.GRASS) : y >= top - 3 ? BLOCK.DIRT : BLOCK.STONE;
+          putRaw(x, y, z, id);
+        }
       }
     }
-  }
-  for (let x = -HALF_WORLD + 3; x < HALF_WORLD - 3; x += 5) {
-    for (let z = -HALF_WORLD + 3; z < HALF_WORLD - 3; z += 5) {
-      if (hash(x, z, seed) < 0.66 || Math.hypot(x, z) < 9) continue;
-      const ground = surfaceY(x, z);
-      const trunk = 3 + Math.floor(hash(z, x, seed + 1) * 3);
-      for (let y = 1; y <= trunk; y++) putRaw(x, ground + y, z, BLOCK.WOOD);
-      for (let dy = -1; dy <= 2; dy++) {
-        const radius = dy === 2 ? 1 : 2;
-        for (let dx = -radius; dx <= radius; dx++) {
-          for (let dz = -radius; dz <= radius; dz++) {
-            if (Math.abs(dx) === radius && Math.abs(dz) === radius && hash(x + dx, z + dz, seed + dy) < 0.45) continue;
-            const bx = x + dx, by = ground + trunk + dy, bz = z + dz;
+    // Generate deterministic tree canopies across chunk borders.
+    for (let tx = startX - 2; tx < startX + CHUNK_SIZE + 2; tx++) {
+      for (let tz = startZ - 2; tz < startZ + CHUNK_SIZE + 2; tz++) {
+        if (tx % 5 !== 0 || tz % 5 !== 0 || hash(tx, tz, seed) < 0.66 || Math.hypot(tx, tz) < 9) continue;
+        const ground = surfaceY(tx, tz), trunk = 3 + Math.floor(hash(tz, tx, seed + 1) * 3);
+        for (let y = 1; y <= trunk; y++) putRaw(tx, ground + y, tz, BLOCK.WOOD);
+        for (let dy = -1; dy <= 2; dy++) {
+          const radius = dy === 2 ? 1 : 2;
+          for (let dx = -radius; dx <= radius; dx++) for (let dz = -radius; dz <= radius; dz++) {
+            if (Math.abs(dx) === radius && Math.abs(dz) === radius && hash(tx + dx, tz + dz, seed + dy) < 0.45) continue;
+            const bx = tx + dx, by = ground + trunk + dy, bz = tz + dz;
             if (getBlock(bx, by, bz) === BLOCK.AIR) putRaw(bx, by, bz, BLOCK.LEAVES);
           }
         }
       }
     }
+    for (const [k, id] of changes) {
+      const [x, y, z] = k.split(',').map(Number);
+      if (chunkOf(x) === cx && chunkOf(z) === cz) {
+        if (id === BLOCK.AIR) blocks.delete(k); else blocks.set(k, id);
+      }
+    }
+  }
+  function unloadChunkData(cx, cz) {
+    dataChunks.delete(chunkKey(cx, cz));
+    const minX = cx * CHUNK_SIZE, maxX = minX + CHUNK_SIZE;
+    const minZ = cz * CHUNK_SIZE, maxZ = minZ + CHUNK_SIZE;
+    for (const k of Array.from(blocks.keys())) {
+      const [x, , z] = k.split(',').map(Number);
+      if (x >= minX && x < maxX && z >= minZ && z < maxZ) blocks.delete(k);
+    }
+  }
+  function updateStreaming(position) {
+    const pcx = chunkOf(position.x), pcz = chunkOf(position.z);
+    const wanted = new Set();
+    for (let cx = pcx - RENDER_DISTANCE - 1; cx <= pcx + RENDER_DISTANCE + 1; cx++) {
+      for (let cz = pcz - RENDER_DISTANCE - 1; cz <= pcz + RENDER_DISTANCE + 1; cz++) wanted.add(chunkKey(cx, cz));
+    }
+    for (const [ck, mesh] of Array.from(chunks.entries())) {
+      if (!wanted.has(ck)) { group.remove(mesh); mesh.geometry.dispose(); chunks.delete(ck); }
+    }
+    for (const ck of Array.from(dataChunks)) {
+      if (!wanted.has(ck)) { const [cx, cz] = ck.split(',').map(Number); unloadChunkData(cx, cz); }
+    }
+    for (const ck of wanted) {
+      const [cx, cz] = ck.split(',').map(Number);
+      if (!chunks.has(ck)) buildChunk(cx, cz);
+    }
   }
 
   function buildChunk(cx, cz) {
-    if (cx < -WORLD_CHUNKS / 2 || cx >= WORLD_CHUNKS / 2 || cz < -WORLD_CHUNKS / 2 || cz >= WORLD_CHUNKS / 2) return;
+    ensureChunkData(cx, cz);
     const ck = chunkKey(cx, cz);
     const old = chunks.get(ck);
     if (old) { group.remove(old); old.geometry.dispose(); }
@@ -135,12 +173,8 @@ export function createVoxelWorld(scene) {
     chunks.set(ck, mesh); group.add(mesh);
   }
 
-  const minChunk = -Math.floor(WORLD_CHUNKS / 2);
-  const maxChunk = minChunk + WORLD_CHUNKS - 1;
-  for (let cx = minChunk; cx <= maxChunk; cx++) {
-    for (let cz = minChunk; cz <= maxChunk; cz++) buildChunk(cx, cz);
-  }
   scene.add(group);
+  updateStreaming(new THREE.Vector3(0.5, 0, 0.5));
 
   function rebuildAt(x, z) {
     const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
@@ -185,6 +219,7 @@ export function createVoxelWorld(scene) {
     return true;
   }
   function getHeightAt(x, z) {
+    ensureChunkData(chunkOf(x), chunkOf(z));
     const bx = Math.floor(x), bz = Math.floor(z);
     for (let y = MAX_Y - 1; y >= 0; y--) {
       if (getBlock(bx, y, bz)) return y + 2.65;
@@ -195,7 +230,8 @@ export function createVoxelWorld(scene) {
     if (!Array.isArray(saved)) return;
     for (const entry of saved) {
       if (!entry || !Number.isInteger(entry.x) || !Number.isInteger(entry.y) || !Number.isInteger(entry.z)) continue;
-      if (entry.x < -HALF_WORLD || entry.x >= HALF_WORLD || entry.z < -HALF_WORLD || entry.z >= HALF_WORLD || entry.y < 0 || entry.y >= MAX_Y) continue;
+      if (entry.y < 0 || entry.y >= MAX_Y) continue;
+      ensureChunkData(chunkOf(entry.x), chunkOf(entry.z));
       const id = Number(entry.id);
       if (!Number.isInteger(id) || id < BLOCK.AIR || id > BLOCK.LEAVES) continue;
       const k = key(entry.x, entry.y, entry.z);
@@ -225,9 +261,9 @@ export function createVoxelWorld(scene) {
     }
     changes.clear();
     originals.clear();
-    for (let cx = -WORLD_CHUNKS / 2; cx < WORLD_CHUNKS / 2; cx++) {
-      for (let cz = -WORLD_CHUNKS / 2; cz < WORLD_CHUNKS / 2; cz++) buildChunk(cx, cz);
-    }
+    for (const mesh of chunks.values()) { group.remove(mesh); mesh.geometry.dispose(); }
+    chunks.clear(); blocks.clear(); dataChunks.clear();
+    updateStreaming(new THREE.Vector3(0.5, 0, 0.5));
   }
   function serializeChanges() {
     return Array.from(changes, ([k, id]) => {
@@ -246,7 +282,7 @@ export function createVoxelWorld(scene) {
 
   return {
     group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
-    applyChanges, resetChanges, serializeChanges, blockName,
+    applyChanges, resetChanges, serializeChanges, blockName, updateStreaming,
     get spawn() { return new THREE.Vector3(0.5, getHeightAt(0, 0), 0.5); },
     dispose
   };
