@@ -16,18 +16,20 @@ const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,260);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<=800?1.2:1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=innerWidth>800;document.body.appendChild(renderer.domElement);
 const controls=new PointerLockControls(camera,renderer.domElement);scene.add(controls.object);
-scene.add(new THREE.HemisphereLight(0xb9e3ff,0x4b613c,1.65));
+const hemi=new THREE.HemisphereLight(0xb9e3ff,0x4b613c,1.65);scene.add(hemi);
 const light=new THREE.DirectionalLight(0xffe2b8,1.6);light.position.set(22,30,16);light.castShadow=true;scene.add(light);
 
 const voxelWorld=createVoxelWorld(scene);
 zoneText.textContent='MUNDO CÚBICO';
 const BLOCK=voxelWorld.BLOCK;
-const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0,13:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,stoneShovel:0,sword:0,stoneSword:0,ironSword:0,ironAxe:0,ironShovel:0,craftingTable:0,furnace:0};
-let selectedBlock=BLOCK.DIRT;
-try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v2-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
+const inventory={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0,13:0,planks:0,sticks:0,coal:0,ironIngot:0,goldIngot:0,pickaxe:0,stonePickaxe:0,ironPickaxe:0,axe:0,stoneAxe:0,shovel:0,stoneShovel:0,sword:0,stoneSword:0,ironSword:0,ironAxe:0,ironShovel:0,craftingTable:0,furnace:0,rawBeef:0,rawPork:0,rawChicken:0,leather:0,feathers:0};
+let selectedBlock=BLOCK.DIRT,worldClock=0;
+try{const saved=JSON.parse(localStorage.getItem('tekaym-voxel-save-v2-'+activeRoomCode)||'null');if(saved&&Array.isArray(saved.blocks))voxelWorld.applyChanges(saved.blocks);if(saved&&saved.inventory&&typeof saved.inventory==='object')for(const id of Object.keys(inventory))inventory[id]=Math.max(0,Math.min(9999,Number(saved.inventory[id])||0));selectedBlock=Number.isInteger(saved?.selectedBlock)?saved.selectedBlock:BLOCK.DIRT;worldClock=Number.isFinite(saved?.worldClock)?((saved.worldClock%1200)+1200)%1200:0;}catch(e){console.warn('[TEKAYM] No se pudo cargar el mundo guardado',e)}
 controls.object.position.copy(voxelWorld.safeSpawn());
 const loader=new GLTFLoader(),assetRoot=new THREE.Group();scene.add(assetRoot);
-const zombies=[],remotePlayers=new Map();
+const zombies=[],animals=[],remotePlayers=new Map();
+let nightActive=false,lastAnimalSpawn=0,animalSequence=0;
+const worldClockText=$('worldClock');
 const keys={w:false,a:false,s:false,d:false};
 let streamedChunkX=Infinity,streamedChunkZ=Infinity;
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false};
@@ -156,7 +158,7 @@ function attack(){
 function setKey(e,v){if(e.code==='KeyW')keys.w=v;if(e.code==='KeyA')keys.a=v;if(e.code==='KeyS')keys.s=v;if(e.code==='KeyD')keys.d=v;if(e.code==='ShiftLeft'||e.code==='ShiftRight')keys.shift=v;if(v&&e.code==='Space')attack()}
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
-addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();});
+addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='KeyE')mineBlock();if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectNextBlock();if(e.code==='KeyF')eatFood();});
 addEventListener('mousedown',e=>{if(innerWidth>800&&controls.isLocked){if(e.button===0)mineBlock();if(e.button===2)placeSelectedBlock();}});
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 knifeHit.addEventListener('click',attack);
@@ -265,5 +267,8 @@ async function bootGame(){
  if(!googleReady)showLogin('Configura Google y el servidor para iniciar sesión.');
 }
 bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('Error recuperable del prototipo.');setTimeout(()=>boot.classList.add('hidden'),700);const serverNotConfigured=SERVER_URL.includes('YOUR-SUBDOMAIN')||SERVER_URL.includes('YOUR-TEKAYM');if(serverNotConfigured)loginGate.classList.add('hidden');else initGoogle()});
-function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
+function isNight(){return worldClock>=650&&worldClock<1150}
+ function isDaylight(){return worldClock<600||worldClock>=1200}
+ function updateDayCycle(dt){worldClock=(worldClock+dt)%1200;const phase=worldClock/1200*Math.PI*2,elevation=Math.sin(phase),day=THREE.MathUtils.clamp((elevation+.12)/.5,0,1),twilight=THREE.MathUtils.clamp(1-Math.abs(elevation)*4,0,1);const daylight=day*day*(3-2*day);const skyDay=new THREE.Color(0x8bc5e8),skyNight=new THREE.Color(0x071020),skyDawn=new THREE.Color(0xe99560),sky=new THREE.Color().copy(skyNight).lerp(skyDay,daylight).lerp(skyDawn,twilight*.42);scene.background.copy(sky);scene.fog.color.copy(sky);light.intensity=.08+daylight*1.55;light.color.set(isNight()?0x9bb8ed:0xffe2b8);light.position.set(Math.cos(phase)*45,Math.sin(phase)*42,16);hemi.intensity=.25+daylight*1.4;hemi.color.set(isNight()?0x536baf:0xb9e3ff);hemi.groundColor.set(isNight()?0x111a2a:0x4b613c);if(worldClockText){const label=worldClock<600?'DÍA':worldClock<650?'ATARDECER':worldClock<1150?'NOCHE':'AMANECER';const total=Math.floor(worldClock/1200*24*60),hh=String(Math.floor(total/60)).padStart(2,'0'),mm=String(total%60).padStart(2,'0');worldClockText.textContent=label+' · '+hh+':'+mm}const nowNight=isNight();if(nowNight&&!nightActive){nightActive=true;let n=0;for(const z of zombies){if(n++>=7)break;z.position.copy(randomZombiePosition());z.userData.hp=45;z.visible=true}}else if(!nowNight&&nightActive){nightActive=false;for(const z of zombies)z.visible=false}for(const z of zombies)if(!nowNight)z.visible=false;updateAnimals(performance.now(),dt);}
+ function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(!player.dead){updateDayCycle(dt);moveLocal(dt);updateNeeds(dt);player.cooldown=Math.max(0,player.cooldown-dt);if(knife)knife.rotation.z=Math.min(-.2,knife.rotation.z+.08);for(const z of zombies){if(!z.visible)continue;if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();requestAnimationFrame(animate);
