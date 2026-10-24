@@ -237,6 +237,7 @@ jobs:
           const main=fs.readFileSync('src/main.js','utf8');
           const worker=fs.readFileSync('worker/src/index.js','utf8');
           if(!main.includes('function disconnectMultiplayer()')) throw new Error('Multiplayer disconnect cleanup missing');
+           if(!main.includes('function readInviteFromLink()')||!main.includes('id="p2pShareOffer"')||!main.includes('id="p2pShareAnswer"')) throw new Error('Easy shareable multiplayer invitation flow missing');
           if(!main.includes('function showGameMenu(){if(gameStarted)saveWorld();gameStarted=false;disconnectMultiplayer();')) throw new Error('Returning to menu does not close the old session');
           if(!main.includes('connected=true;spawnProceduralZombies(18)')) throw new Error('Multiplayer zombies are not initialized');
           if(!main.includes('gameStarted=true;gameMenu.classList.add(\'hidden\')')) throw new Error('Joined multiplayer world does not activate gameplay');
