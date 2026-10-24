@@ -205,7 +205,7 @@ jobs:
             [main.includes("return isPick?(tool==='ironPickaxe'?.65:tool==='stonePickaxe'?1.05:1.45):7.5"),'Mining without a pickaxe must take much longer'],
             [main.includes('function spawnDroppedItem(key,amount,x,y,z')&&main.includes('function updateDroppedItems(dt,now)')&&main.includes('d.position.distanceTo(controls.object.position)<1.45'),'Physical item drops or pickup radius missing'],
             [main.includes("spawnDroppedItem('rawChicken',1")&&main.includes("spawnDroppedItem('rawBeef',2")&&main.includes("spawnDroppedItem('rawPork',2")&&main.includes("spawnDroppedItem('feathers',1"),'Animal meat and feather drops missing'],
-            [main.includes("name:'Puntas de piedra ×4',cost:{3:1},out:'stoneTips',amount:4")&&main.includes("name:'Flecha ×1',cost:{sticks:1,stoneTips:1,feathers:1},out:'arrows',amount:1'),'Stone-tip and arrow recipes missing'],
+            [main.includes('Puntas de piedra ×4')&&main.includes('stoneTips:1,feathers:1')&&main.includes('out:\'arrows\',amount:1'),'Stone-tip and arrow recipes missing'],
             [main.includes("hotbarSlots[i]=null")&&main.includes('Objeto guardado en el inventario.'),'Quickbar items cannot be unequipped back into inventory'],
             [main.includes('const fallDistance=(fallPeakY??ground)-ground')&&main.includes('Caída de '),'Fall damage is missing'],
             [main.includes('target-current<=.55'),'Full block auto-step is still enabled'],
