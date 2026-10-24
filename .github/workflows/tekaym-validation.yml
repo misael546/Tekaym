@@ -52,6 +52,7 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
           const voxel=fs.readFileSync('src/voxel-world.js','utf8');
           const worker=fs.readFileSync('worker/src/index.js','utf8');
           const html=fs.readFileSync('index.html','utf8');
