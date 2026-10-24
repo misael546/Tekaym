@@ -52,9 +52,9 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
           const voxel=fs.readFileSync('src/voxel-world.js','utf8');
           const worker=fs.readFileSync('worker/src/index.js','utf8');
-          const html=fs.readFileSync('index.html','utf8');
           const checks=[
             [((main.includes("createVoxelWorld(scene)")||main.includes("createVoxelWorld(scene,worldSeed)"))||main.includes("createVoxelWorld(scene,worldSeed)")),'Voxel world is not integrated into the client'],
             [main.includes('function updateMining(dt)')&&main.includes('voxelWorld.breakBlock(camera,miningNdc)'),'Progressive mining action missing'],
@@ -199,9 +199,10 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
           const voxel=fs.readFileSync('src/voxel-world.js','utf8');
           const checks=[
-            [main.includes('function miningTime(id)')&&main.includes('function updateMining(dt)')&&main.includes('new THREE.CircleGeometry(.34,32)'),'Progressive mining and hit-point indicator missing'],
+            [main.includes('function miningTime(id)')&&main.includes('function updateMining(dt)')&&main.includes('marker.classList.add(\'mining\')')&&!main.includes('new THREE.CircleGeometry(.34,32)'),'Single touch mining indicator missing'],
             [main.includes("return isPick?(tool==='ironPickaxe'?.65:tool==='stonePickaxe'?1.05:1.45):7.5"),'Mining without a pickaxe must take much longer'],
             [main.includes('function spawnDroppedItem(key,amount,x,y,z')&&main.includes('function updateDroppedItems(dt,now)')&&main.includes('d.position.distanceTo(controls.object.position)<1.45'),'Physical item drops or pickup radius missing'],
             [main.includes("spawnDroppedItem('rawChicken',1")&&main.includes("spawnDroppedItem('rawBeef',2")&&main.includes("spawnDroppedItem('rawPork',2")&&main.includes("spawnDroppedItem('feathers',1"),'Animal meat and feather drops missing'],
@@ -209,6 +210,9 @@ jobs:
             [main.includes("hotbarSlots[i]=null")&&main.includes('Objeto guardado en el inventario.'),'Quickbar items cannot be unequipped back into inventory'],
             [main.includes('const fallDistance=(fallPeakY??ground)-ground')&&main.includes('Caída de '),'Fall damage is missing'],
             [main.includes('target-current<=.55'),'Full block auto-step is still enabled'],
+            [main.includes('const stopMine=()=>')&&main.includes('miningActive=false;mineSingle=false;miningTarget=null;miningProgress=0;resetMiningIndicator()'),'Mining does not stop and reset on touch release'],
+            [!main.includes('mineTimer=setTimeout(()=>mineWhileHeld(pointerId),430)'),'Repeated mining timer can retain a stale touch target'],
+            [html.includes('#touchAimSphere.mining')&&html.includes('conic-gradient')&&!html.includes('new THREE.CircleGeometry'),'Touch and mining must share one circle'],
             [voxel.includes('new THREE.Color(0x597342)')&&voxel.includes('new THREE.Color(0x6c4934)')&&voxel.includes('new THREE.Color(0x77766f)'),'Medieval earthy pixel palette missing']
           ];
           for(const [ok,message] of checks)if(!ok)throw new Error(message);
