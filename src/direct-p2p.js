@@ -65,22 +65,15 @@ export async function createDirectGuest(offerText, { onMessage, onOpen, onClose 
   pc.addEventListener('connectionstatechange', () => {
     if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) onClose?.(pc.connectionState);
   });
-  const channelPromise = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('No se recibió el canal del anfitrión. Revisa la invitación e inténtalo otra vez.')), 20000);
-    pc.addEventListener('datachannel', event => {
-      clearTimeout(timeout);
-      pc._tekaymChannel = event.channel;
-      wireChannel(event.channel, onMessage, onOpen, onClose);
-      resolve(event.channel);
-    }, { once: true });
-  });
+  pc.addEventListener('datachannel', event => {
+    pc._tekaymChannel = event.channel;
+    wireChannel(event.channel, onMessage, onOpen, onClose);
+  }, { once: true });
   await pc.setRemoteDescription(parseDescription(offerText, 'offer'));
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitForIce(pc);
   const answerText = JSON.stringify(pc.localDescription);
-  // Keep the promise alive so callers can observe connection errors without blocking the answer display.
-  channelPromise.catch(error => onClose?.(error.message));
   return {
     pc,
     answerText,
@@ -109,14 +102,4 @@ function wireChannel(channel, onMessage, onOpen, onClose) {
   });
   channel.addEventListener('close', () => onClose?.('closed'));
   channel.addEventListener('error', () => onClose?.('error'));
-  // Keep a reference for the guest-side send method.
-  channel.addEventListener('open', () => { channel._unused = true; });
-  Object.defineProperty(channel, 'sendTekaym', { value: message => {
-    if (channel.readyState !== 'open') return false;
-    channel.send(JSON.stringify(message));
-    return true;
-  }});
-  // RTCPeerConnection has no public channel property; attach it for our wrapper.
-  // The channel is assigned by the caller through this weakly named property.
-  try { channel.__tekaymOwner = channel; } catch {}
 }
