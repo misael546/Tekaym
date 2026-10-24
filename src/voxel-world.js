@@ -270,7 +270,14 @@ export function createVoxelWorld(scene, seedValue=7919) {
     if (!hit) return false;
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
     if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
-    if (playerPosition && Math.abs(x + 0.5 - playerPosition.x) < 0.8 && Math.abs(z + 0.5 - playerPosition.z) < 0.8 && y < playerPosition.y + 1.8 && y + 1 > playerPosition.y - 1.8) return false;
+    if (playerPosition) {
+      // Avoid only the player's real footprint, not the old oversized 0.8 m radius.
+      const overlapsX = Math.abs(x + 0.5 - playerPosition.x) < 0.34;
+      const overlapsZ = Math.abs(z + 0.5 - playerPosition.z) < 0.34;
+      const feetY = playerPosition.y - 1.65, headY = playerPosition.y + 0.12;
+      const overlapsY = y < headY - 0.02 && y + 1 > feetY + 0.02;
+      if (overlapsX && overlapsZ && overlapsY) return false;
+    }
     const k = key(x, y, z);
     if (!changes.has(k)) originals.set(k, getBlock(x, y, z));
     putRaw(x, y, z, id);
@@ -306,12 +313,10 @@ export function createVoxelWorld(scene, seedValue=7919) {
     return new THREE.Vector3(x + 0.5, surfaceY(x, z) + 2.65, z + 0.5);
   }
   function getHeightAt(x, z) {
-    ensureChunkData(chunkOf(x), chunkOf(z));
     const bx = Math.floor(x), bz = Math.floor(z);
-    const naturalTop = surfaceY(bx, bz);
-    for (let y = Math.min(MAX_Y - 1, naturalTop); y >= 0; y--) {
-      if (getBlock(bx, y, bz)) return y + 2.65;
-    }
+    ensureChunkData(chunkOf(bx), chunkOf(bz));
+    // Respect placed blocks above terrain and holes where surface blocks were removed.
+    for (let y = MAX_Y - 1; y >= 0; y--) if (getBlock(bx, y, bz)) return y + 2.65;
     return 1.65;
   }
   function applyChanges(saved) {
