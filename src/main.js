@@ -5,7 +5,7 @@ import {GAME_VERSION,SERVER_URL,HTTP_SERVER_URL} from './config.js';
 import {createVoxelWorld} from './voxel-world.js';
 
 const $=id=>document.getElementById(id);
-let toastTimer=0;function showToast(message){const el=$('toast');if(!el)return;el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1900)}
+let toastTimer=0,toastElement=null;function showToast(message){if(!toastElement){toastElement=document.createElement('div');toastElement.setAttribute('role','status');toastElement.style.cssText='position:fixed;left:50%;top:64px;transform:translateX(-50%);max-width:88vw;padding:9px 13px;border:1px solid #5b6a78;border-radius:9px;background:#111a24ed;color:#f2f5f8;font:700 12px Arial,sans-serif;text-align:center;opacity:0;transition:opacity .15s;pointer-events:none;z-index:80';document.body.appendChild(toastElement)}toastElement.textContent=message;toastElement.style.opacity='1';clearTimeout(toastTimer);toastTimer=setTimeout(()=>{if(toastElement)toastElement.style.opacity='0'},1900)}
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
 const serverIsConfigured=!/YOUR-SUBDOMAIN|YOUR-TEKAYM/.test(SERVER_URL);
 const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginStatus=$('loginStatus'),googleButton=$('googleButton'),gameMenu=$('gameMenu'),inventoryModal=$('inventoryModal'),recipeList=$('recipeList'),inventoryGrid=$('inventoryGrid'),hotbarEl=$('hotbar'); let gameStarted=false,selectedHotbar=0,hotbarSlots=Array(9).fill(null),worldSeed=7919;
