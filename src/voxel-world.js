@@ -315,8 +315,15 @@ export function createVoxelWorld(scene, seedValue=7919) {
   function getHeightAt(x, z) {
     const bx = Math.floor(x), bz = Math.floor(z);
     ensureChunkData(chunkOf(bx), chunkOf(bz));
-    // Respect placed blocks above terrain and holes where surface blocks were removed.
-    for (let y = MAX_Y - 1; y >= 0; y--) if (getBlock(bx, y, bz)) return y + 2.65;
+    const naturalTop = surfaceY(bx, bz);
+    // Include player-placed blocks above the terrain, but ignore natural tree canopies.
+    for (let y = MAX_Y - 1; y > naturalTop; y--) {
+      const k = key(bx, y, bz);
+      if (changes.has(k) && changes.get(k) !== BLOCK.AIR) return y + 2.65;
+    }
+    for (let y = Math.min(MAX_Y - 1, naturalTop); y >= 0; y--) {
+      if (getBlock(bx, y, bz)) return y + 2.65;
+    }
     return 1.65;
   }
   function applyChanges(saved) {
