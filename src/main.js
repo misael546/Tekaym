@@ -44,7 +44,7 @@ const worldClockText=$('worldClock');let lastClockSave=0;
 const keys={w:false,a:false,s:false,d:false};
 let streamedChunkX=Infinity,streamedChunkZ=Infinity;
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false,grounded:true,jumpVelocity:0};
-let knife=null,handModel=null,heldVisual=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,googleReady=false,connected=false;
+let knife=null,handModel=null,heldVisual=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,lastP2PHeartbeat=0,googleReady=false,connected=false;
 let p2pConnection=null,p2pRole=null,p2pRemoteId='p2p-guest',pendingP2PWorld=null;const p2pHostPeers=new Map();
 function disconnectMultiplayer(){
  if(p2pConnection){try{p2pConnection.close()}catch{}}
@@ -396,9 +396,10 @@ function handleP2PMessage(message,sourcePeerId=null){
   if(Number.isFinite(Number(snapshot.seed))){worldSeed=Number(snapshot.seed);voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);voxelWorld.applyChanges(snapshot.blocks);}
   currentWorldMeta={...(snapshot.meta||{}),id:'p2p-guest-'+String(snapshot.meta?.id||'world'),name:(snapshot.meta?.name||'Mundo de amigo')+' (invitado)',seed:worldSeed};
   activeRoomCode=currentWorldMeta.id;
-  for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(snapshot.inventory?.[k])||0));
-  if(Array.isArray(snapshot.hotbarSlots))hotbarSlots=snapshot.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);
-  selectedBlock=Number(snapshot.selectedBlock)||BLOCK.DIRT;worldClock=Number(snapshot.worldClock)||0;
+  let guestSave=null;try{guestSave=JSON.parse(localStorage.getItem(roomSaveKey())||'null')}catch{}
+  for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(guestSave?.inventory?.[k])||0));
+  if(Array.isArray(guestSave?.hotbarSlots))hotbarSlots=guestSave.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);else hotbarSlots=Array(9).fill(null);
+  selectedHotbar=Number(guestSave?.selectedHotbar)||0;selectedBlock=Number(guestSave?.selectedBlock)||BLOCK.DIRT;worldClock=Number(snapshot.worldClock)||0;
   if(snapshot.playerPosition){const p=snapshot.playerPosition;controls.object.position.set(Number(p.x)||0,Number(p.y)||voxelWorld.getHeightAt(Number(p.x)||0,Number(p.z)||0),Number(p.z)||0)}
   gameStarted=true;gameMenu.classList.add('hidden');loginGate.classList.add('hidden');boot.classList.add('hidden');$('directP2PModal')?.classList.add('hidden');$('hud').style.display='block';$('touch').style.display='';
   voxelWorld.updateStreaming(controls.object.position);streamedChunkX=Math.floor(controls.object.position.x/16);streamedChunkZ=Math.floor(controls.object.position.z/16);syncTorchLights();renderHotbar();updateInventoryHud();saveWorld();zoneText.textContent='INVITADO · '+(snapshot.meta?.name||'MUNDO');
@@ -510,10 +511,9 @@ function applyState(m){
 }
 function sendMove(now){
  if(!connected||now-lastNet<200)return;
- const x=controls.object.position.x,z=controls.object.position.z;
- if(Math.hypot(x-lastSentX,z-lastSentZ)<.08)return;
- lastNet=now;lastSentX=x;lastSentZ=z;
- if(p2pConnection){sendP2P({type:'player_state',id:p2pRole==='host'?'p2p-host':'p2p-guest',x,z,hp:player.hp,hunger:player.hunger,thirst:player.thirst,worldClock});return}
+ const x=controls.object.position.x,z=controls.object.position.z, moved=Math.hypot(x-lastSentX,z-lastSentZ)>=.08;
+ if(p2pConnection){if(!moved&&now-lastP2PHeartbeat<1000)return;lastNet=now;lastP2PHeartbeat=now;lastSentX=x;lastSentZ=z;sendP2P({type:'player_state',id:p2pRole==='host'?'p2p-host':'p2p-guest',x,z,hp:player.hp,hunger:player.hunger,thirst:player.thirst,worldClock});return}
+ if(!moved)return;lastNet=now;lastSentX=x;lastSentZ=z;
  if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'move',x,z}));
 }
 function installTouch(){
