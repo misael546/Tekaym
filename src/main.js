@@ -259,7 +259,7 @@ function mineBlock(ndc=null){
  if(player.dead)return;const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
  const need=currentWorldMeta.mode==='creative'?null:id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
  if(need&&!inventory[need]){showToast(need==='pickaxe'?'La piedra y el carbón requieren un pico de madera.':need==='stonePickaxe'?'El hierro requiere un pico de piedra.':'El oro y el diamante requieren un pico de hierro.');return}
- swingHeldItem();const removed=voxelWorld.breakBlock(camera,ndc);if(!removed)return;
+ swingHeldItem();const removed=ndc?voxelWorld.breakBlock(camera,ndc):voxelWorld.breakBlock(camera);if(!removed)return;
  const colors={1:0x609447,2:0x79553a,3:0x777c80,4:0xc8b77a,5:0x79502e,6:0x3e713b,7:0x34383d,8:0xb98f78,9:0xe3bd36,10:0x45d9d2,11:0xb98a52,12:0x8b5b32,13:0x55565a,14:0xe9a24b};spawnBlockParticles(hit.x,hit.y,hit.z,colors[removed]||0xaaaaaa);
  const drops={[BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE,[BLOCK.TORCH]:BLOCK.TORCH};
  const drop=drops[removed];if(drop!==undefined&&currentWorldMeta.mode!=='creative'){inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0||inventory.ironAxe>0)?2:1);addToHotbar(drop)}
