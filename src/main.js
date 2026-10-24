@@ -372,20 +372,20 @@ function installTouch(){
  for(const [id,key] of padKeys)bindHold(id,key);
  const crouch=$('touchCrouch');if(crouch)crouch.addEventListener('click',()=>{keys.crouch=!keys.crouch;crouch.classList.toggle('active',keys.crouch);crouch.textContent=keys.crouch?'●':'○'});
  $('touchJump')?.addEventListener('click',jumpPlayer);$('touchInventory')?.addEventListener('click',openInventory);$('touchFs')?.addEventListener('click',()=>requestLandscape());
- let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0,mineLoop=0;
- const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);if(mineLoop)clearInterval(mineLoop);mineTimer=mineLoop=0};
+ let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0;
+ const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);mineTimer=0};
  renderer.domElement.addEventListener('pointerdown',e=>{
   if(!isTouchDevice||!gameStarted||!inventoryModal.classList.contains('hidden')||e.pointerType==='mouse')return;
   activePointer=e.pointerId;startX=lastX=e.clientX;startY=lastY=e.clientY;startedAt=performance.now();moved=false;
   try{renderer.domElement.setPointerCapture(e.pointerId)}catch{}
-  stopMine();mineTimer=setTimeout(()=>{if(activePointer===e.pointerId&&!moved){mineBlock();mineLoop=setInterval(()=>{if(activePointer===e.pointerId&&!moved)mineBlock();else stopMine()},650)}},420);
+  stopMine();mineTimer=setTimeout(()=>{if(activePointer===e.pointerId&&!moved)mineBlock()},650);
  });
  renderer.domElement.addEventListener('pointermove',e=>{
   if(e.pointerId!==activePointer)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
   if(Math.hypot(e.clientX-startX,e.clientY-startY)>8){moved=true;stopMine()}
   if(moved){lookYaw-=dx*.006;lookPitch=Math.max(-1.15,Math.min(1.15,lookPitch-dy*.0045));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch}
  });
- const finish=e=>{if(e.pointerId!==activePointer)return;const duration=performance.now()-startedAt,wasMoved=moved;stopMine();activePointer=null;try{renderer.domElement.releasePointerCapture(e.pointerId)}catch{}if(!wasMoved&&duration<260)placeSelectedBlock()};
+ const finish=e=>{if(e.pointerId!==activePointer)return;const duration=performance.now()-startedAt,wasMoved=moved;stopMine();activePointer=null;try{renderer.domElement.releasePointerCapture(e.pointerId)}catch{}if(!wasMoved&&duration<260){const held=hotbarSlots[selectedHotbar];if(held&&Number(held)>=1&&Number(held)<=14&&(inventory[held]||0)>0)placeSelectedBlock();else attack()}};
  renderer.domElement.addEventListener('pointerup',finish);renderer.domElement.addEventListener('pointercancel',e=>{if(e.pointerId===activePointer){stopMine();activePointer=null}});
 }
 installTouch();
