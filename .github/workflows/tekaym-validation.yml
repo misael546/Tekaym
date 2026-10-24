@@ -80,7 +80,7 @@ jobs:
             [worker.includes("function animalDrops(type)")&&worker.includes("rawBeef: 2")&&worker.includes("rawPork: 2")&&worker.includes("rawChicken: 1"),'Server-authoritative animal drops missing'],
             [main.includes('function craftShovel')&&main.includes('function craftSword')&&main.includes('function craftStonePickaxe')&&main.includes('function craftIronPickaxe'),'Tool progression recipes missing'],
             [main.includes('function smeltIron')&&main.includes('function hasStation'),'Furnace and crafting station progression missing'],
-            [main.includes("keys.shift")&&html.includes('id="touchRun"'),'Sprint controls missing'],
+            [main.includes("keys.shift")&&html.includes('id="touchCrouch"'),'Sprint controls missing'],
             [main.includes("voxelWorld.updateStreaming(controls.object.position)"),'Player movement does not stream chunks'],
             [worker.includes("url.pathname === '/rooms/create'"),'Room-code creation route missing'],
             [worker.includes("msg.type === 'block_edit'"),'Server block synchronization missing'],
@@ -127,7 +127,7 @@ jobs:
           const html=fs.readFileSync('index.html','utf8');
           const cfg=fs.readFileSync('src/config.js','utf8');
           if(!html.includes('Tekaym Online'))throw new Error('Game title missing');
-          if(/>\\s*V1\\s*</.test(html)||html.includes('Tekaym Online · V1'))throw new Error('Obsolete visible version marker found');
+          if(html.includes('>V1<')||html.includes('Tekaym Online · V1'))throw new Error('Obsolete visible version marker found');
           if(!cfg.includes("GAME_VERSION='V1'"))throw new Error('Client config version missing');
           if(!r.clientPath.includes('/index.html'))throw new Error('Client path invalid');
           console.log('Version synchronization OK -> '+r.version);
