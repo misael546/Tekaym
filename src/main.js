@@ -128,13 +128,20 @@ function randomNearPlayer(min=10,max=28){
  const x=Math.floor(controls.object.position.x+min),z=Math.floor(controls.object.position.z),h=voxelWorld.getHeightAt(x,z);return new THREE.Vector3(x,h-1.65,z);
 }
 function randomZombiePosition(){let p;for(let i=0;i<24;i++){p=randomNearPlayer(24,32);if(!isTorchProtected(Math.floor(p.x),Math.floor(p.z)))break}p.y=voxelWorld.getHeightAt(p.x,p.z)-1.65;return p}
+function makePixelNoiseTexture(seed=1){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=16;
+ const ctx=canvas.getContext('2d');const palette=['#ffffff','#e5e5e5','#c8c8c8','#f5f5f5','#b8b8b8'];
+ let n=seed>>>0;const random=()=>{n=(n*1664525+1013904223)>>>0;return n/4294967296};
+ for(let y=0;y<16;y++)for(let x=0;x<16;x++){ctx.fillStyle=palette[Math.floor(random()*palette.length)];ctx.fillRect(x,y,1,1)}
+ const texture=new THREE.CanvasTexture(canvas);texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;texture.colorSpace=THREE.SRGBColorSpace;return texture;
+}
 function spawnProceduralZombies(count){
  for(let i=0;i<count;i++){
   let z=zombies[i];
   if(!z){
    z=new THREE.Group();
-   const shirt=new THREE.MeshStandardMaterial({color:0x477a52,roughness:1});const torso=new THREE.Mesh(new THREE.BoxGeometry(.58,.78,.3),shirt);torso.position.y=.94;z.add(torso);
-   const skin=new THREE.MeshStandardMaterial({color:0x6f9a55,roughness:1}),white=new THREE.MeshStandardMaterial({color:0xe6e3d8,roughness:1}),pupil=new THREE.MeshStandardMaterial({color:0x201b18,roughness:1});const head=new THREE.Mesh(new THREE.BoxGeometry(.46,.46,.42),skin);head.position.set(0,1.58,0);z.add(head);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.09,.055,.025),white);eye.position.set(x,1.62,.222);z.add(eye);const dot=new THREE.Mesh(new THREE.BoxGeometry(.035,.045,.012),pupil);dot.position.set(x,1.62,.24);z.add(dot)}for(const x of [-.39,.39]){const arm=new THREE.Mesh(new THREE.BoxGeometry(.2,.68,.22),skin);arm.position.set(x,.97,0);arm.userData.isZombieArm=true;arm.userData.side=x;z.add(arm)}const pants=new THREE.MeshStandardMaterial({color:0x303e8b,roughness:1});for(const x of [-.16,.16]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.23,.55,.25),pants);leg.position.set(x,.28,0);z.add(leg)}
+   const shirt=new THREE.MeshStandardMaterial({color:0x477a52,roughness:1,map:makePixelNoiseTexture(17)});const torso=new THREE.Mesh(new THREE.BoxGeometry(.58,.78,.3),shirt);torso.position.y=.94;z.add(torso);
+   const skin=new THREE.MeshStandardMaterial({color:0x6f9a55,roughness:1,map:makePixelNoiseTexture(29)}),white=new THREE.MeshStandardMaterial({color:0xe6e3d8,roughness:1}),pupil=new THREE.MeshStandardMaterial({color:0x201b18,roughness:1});const head=new THREE.Mesh(new THREE.BoxGeometry(.46,.46,.42),skin);head.position.set(0,1.58,0);z.add(head);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.09,.055,.025),white);eye.position.set(x,1.62,.222);z.add(eye);const dot=new THREE.Mesh(new THREE.BoxGeometry(.035,.045,.012),pupil);dot.position.set(x,1.62,.24);z.add(dot)}for(const x of [-.39,.39]){const arm=new THREE.Mesh(new THREE.BoxGeometry(.2,.68,.22),skin);arm.position.set(x,.97,0);arm.userData.isZombieArm=true;arm.userData.side=x;z.add(arm)}const pants=new THREE.MeshStandardMaterial({color:0x303e8b,roughness:1,map:makePixelNoiseTexture(43)});for(const x of [-.16,.16]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.23,.55,.25),pants);leg.position.set(x,.28,0);z.add(leg)}
    zombies.push(z);scene.add(z);
   }
   z.position.copy(randomZombiePosition());
@@ -146,6 +153,7 @@ function spawnProceduralZombies(count){
 }
 function makeAnimal(type){
  const root=new THREE.Group(),mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.9}),coat=mat(type==='cow'?0xe8e1d5:type==='pig'?0xeaa0a0:0xf3f0e5),dark=mat(0x42352d),pink=mat(0xf08e96),yellow=mat(0xe8b52d),red=mat(0xb52e39);
+ coat.map=makePixelNoiseTexture(type==='cow'?53:type==='pig'?67:79);coat.needsUpdate=true;
  const size=type==='cow'?[.78,.66,1.05]:type==='pig'?[.72,.5,.9]:[.4,.4,.52],body=new THREE.Mesh(new THREE.BoxGeometry(...size),coat);body.position.y=type==='chicken'?.48:.62;root.add(body);
  if(type==='cow'){for(const [x,y,z] of [[-.2,.72,.12],[.2,.48,-.18]]){const patch=new THREE.Mesh(new THREE.BoxGeometry(.2,.2,.18),dark);patch.position.set(x,y,z);root.add(patch)}}
  const head=new THREE.Mesh(new THREE.BoxGeometry(type==='cow'?.38:.31,type==='chicken'?.28:type==='cow'?.34:.29,.34),coat);head.position.set(0,type==='chicken'?.76:.83,.44);root.add(head);const eyeMat=mat(0x171717),eyeWhite=mat(0xf5f1df);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.055,.06,.025),eyeWhite);eye.position.set(x,type==='chicken'?.79:.87,.615);root.add(eye);const pupil=new THREE.Mesh(new THREE.BoxGeometry(.025,.04,.012),eyeMat);pupil.position.set(x,type==='chicken'?.79:.87,.633);root.add(pupil)}if(type==='cow'){for(const x of [-.24,.24]){const horn=new THREE.Mesh(new THREE.BoxGeometry(.08,.16,.08),coat);horn.position.set(x,1.02,.42);root.add(horn)}}if(type==='pig'){for(const x of [-.12,.12]){const nostril=new THREE.Mesh(new THREE.BoxGeometry(.035,.04,.015),dark);nostril.position.set(x,.8,.685);root.add(nostril)}}
