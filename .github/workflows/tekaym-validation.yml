@@ -57,7 +57,7 @@ jobs:
           const html=fs.readFileSync('index.html','utf8');
           const checks=[
             [((main.includes("createVoxelWorld(scene)")||main.includes("createVoxelWorld(scene,worldSeed)"))||main.includes("createVoxelWorld(scene,worldSeed)")),'Voxel world is not integrated into the client'],
-            [main.includes("voxelWorld.breakBlock(camera)"),'Mining action missing'],
+            [main.includes('function updateMining(dt)')&&main.includes('voxelWorld.breakBlock(camera,miningNdc)'),'Progressive mining action missing'],
             [main.includes("voxelWorld.placeBlock(camera"),'Block placement missing'],
             [main.includes("voxelWorld.resetChanges("),'Room-switch reset missing'],
             [main.includes("navigator.clipboard.writeText(activeRoomCode)"),'Invite-code copy action missing'],
@@ -73,7 +73,7 @@ jobs:
             [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchCrouch"')&&html.includes('id="dpadUp"'),'Day-night HUD and mobile eating missing'],
             [worker.includes('worldClock: this.worldClock')&&worker.includes("storage.put('worldClock', this.worldClock)"),'Shared persistent world clock missing'],
             [worker.includes('if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;')&&worker.includes('this.zombieSpawnNear(target)'),'Hostile mobs must only move at night and spawn near players'],
-            [main.includes("best.userData.type==='cow'")&&main.includes('inventory.rawBeef')&&main.includes('inventory.leather'),'Animal meat and drops missing'],
+            [main.includes("best.userData.type==='cow'")&&main.includes("spawnDroppedItem('rawBeef',2")&&main.includes("spawnDroppedItem('leather',1"),'Physical animal meat and leather drops missing'],
             [main.includes("if(Array.isArray(m.animals))")&&main.includes("a.userData.networked=true")&&main.includes("type:'animal_attack'")&&main.includes("m.type==='animal_killed'"),'Shared animal rendering, hunting, or rewards missing'],
             [worker.includes("this.animals = await this.ctx.storage.get('animals')")&&worker.includes("storage.put('animals', this.animals)")&&worker.includes("animals: this.animals.map"),'Persistent shared animal state missing'],
             [worker.includes("msg.type === 'animal_attack'")&&worker.includes("this.ensureAnimalsNearPlayers()")&&(worker.includes("this.moveAnimals(elapsed)")||worker.includes("this.moveAnimals(realElapsed || 1)")),'Server animal AI and hunting validation missing'],
@@ -194,6 +194,27 @@ jobs:
           NODE
 
       
+      - name: Validate medieval survival mining, drops, and fall physics
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const main=fs.readFileSync('src/main.js','utf8');
+          const voxel=fs.readFileSync('src/voxel-world.js','utf8');
+          const checks=[
+            [main.includes('function miningTime(id)')&&main.includes('function updateMining(dt)')&&main.includes('new THREE.CircleGeometry(.34,32)'),'Progressive mining and hit-point indicator missing'],
+            [main.includes("return isPick?(tool==='ironPickaxe'?.65:tool==='stonePickaxe'?1.05:1.45):7.5"),'Mining without a pickaxe must take much longer'],
+            [main.includes('function spawnDroppedItem(key,amount,x,y,z')&&main.includes('function updateDroppedItems(dt,now)')&&main.includes('d.position.distanceTo(controls.object.position)<1.45'),'Physical item drops or pickup radius missing'],
+            [main.includes("spawnDroppedItem('rawChicken',1")&&main.includes("spawnDroppedItem('rawBeef',2")&&main.includes("spawnDroppedItem('rawPork',2")&&main.includes("spawnDroppedItem('feathers',1"),'Animal meat and feather drops missing'],
+            [main.includes('Puntas de piedra ×4')&&main.includes('stoneTips:1,feathers:1')&&main.includes('out:\'arrows\',amount:1'),'Stone-tip and arrow recipes missing'],
+            [main.includes("hotbarSlots[i]=null")&&main.includes('Objeto guardado en el inventario.'),'Quickbar items cannot be unequipped back into inventory'],
+            [main.includes('const fallDistance=(fallPeakY??ground)-ground')&&main.includes('Caída de '),'Fall damage is missing'],
+            [main.includes('target-current<=.55'),'Full block auto-step is still enabled'],
+            [voxel.includes('new THREE.Color(0x597342)')&&voxel.includes('new THREE.Color(0x6c4934)')&&voxel.includes('new THREE.Color(0x77766f)'),'Medieval earthy pixel palette missing']
+          ];
+          for(const [ok,message] of checks)if(!ok)throw new Error(message);
+          console.log('Medieval survival mining, drops, crafting, fall damage, and palette checks passed');
+          NODE
+
       - name: Reject obsolete prison-world labels
         run: |
           node - <<'NODE'
