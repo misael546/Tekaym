@@ -55,7 +55,6 @@ jobs:
           const html=fs.readFileSync('index.html','utf8');
           const voxel=fs.readFileSync('src/voxel-world.js','utf8');
           const worker=fs.readFileSync('worker/src/index.js','utf8');
-          const html=fs.readFileSync('index.html','utf8');
           const checks=[
             [((main.includes("createVoxelWorld(scene)")||main.includes("createVoxelWorld(scene,worldSeed)"))||main.includes("createVoxelWorld(scene,worldSeed)")),'Voxel world is not integrated into the client'],
             [main.includes('function updateMining(dt)')&&main.includes('voxelWorld.breakBlock(camera,miningNdc)'),'Progressive mining action missing'],
@@ -200,6 +199,7 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const main=fs.readFileSync('src/main.js','utf8');
+          const html=fs.readFileSync('index.html','utf8');
           const voxel=fs.readFileSync('src/voxel-world.js','utf8');
           const checks=[
             [main.includes('function miningTime(id)')&&main.includes('function updateMining(dt)')&&main.includes('marker.classList.add(\'mining\')')&&!main.includes('new THREE.CircleGeometry(.34,32)'),'Single touch mining indicator missing'],
