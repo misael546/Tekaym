@@ -181,7 +181,7 @@ jobs:
             [main.includes('function jumpPlayer()')&&main.includes('player.jumpVelocity-=18*dt')&&main.includes("e.code==='Space'")&&html.includes('id="touchJump"'),'Keyboard/mobile jump physics missing'],
             [main.includes('lookYaw-=dx*.006')&&main.includes("renderer.domElement.addEventListener('pointercancel'")&&main.includes("renderer.domElement.addEventListener('pointermove'")&&main.includes("['dpadUp','w']"),'Touch drag camera or pointer cancellation recovery missing'],
             [html.includes('class="touchDpad"')&&html.includes('id="touchCrouch"')&&html.includes('id="touchJump"')&&html.includes('.touchDpad #touchCrouch{grid-column:2;grid-row:2;'),'Bedrock-style d-pad, crouch, and jump layout missing'],
-            [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
+            [voxel.includes('Sixteen tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
             [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation'],
             [main.includes('lastAutoSave>10000')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
           ];
