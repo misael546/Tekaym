@@ -272,8 +272,11 @@ export function createVoxelWorld(scene, seedValue=7919) {
     if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;
     if (playerPosition) {
       // Avoid only the player's real footprint, not the old oversized 0.8 m radius.
-      const overlapsX = Math.abs(x + 0.5 - playerPosition.x) < 0.34;
-      const overlapsZ = Math.abs(z + 0.5 - playerPosition.z) < 0.34;
+      // Test the whole block AABB against the player's horizontal collision body.
+      // Center-distance checks let blocks clip into the player near cell edges.
+      const playerRadius = 0.32;
+      const overlapsX = x < playerPosition.x + playerRadius && x + 1 > playerPosition.x - playerRadius;
+      const overlapsZ = z < playerPosition.z + playerRadius && z + 1 > playerPosition.z - playerRadius;
       const feetY = playerPosition.y - 1.65, headY = playerPosition.y + 0.12;
       const overlapsY = y < headY - 0.02 && y + 1 > feetY + 0.02;
       if (overlapsX && overlapsZ && overlapsY) return false;

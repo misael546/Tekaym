@@ -158,7 +158,7 @@ jobs:
           const fs=require('fs'); const m=fs.readFileSync('src/main.js','utf8'); const h=fs.readFileSync('index.html','utf8'); const v=fs.readFileSync('src/voxel-world.js','utf8');
           if(!m.includes('function setKey(e,down)'))throw new Error('Keyboard movement mapping missing');
           if(!m.includes('function beginLocalWorld(isNew)')||!h.includes('id="newLocalWorldButton"'))throw new Error('World menu missing');
-          if(!m.includes('RECIPES.filter(canCraftRecipe)'))throw new Error('Material-filtered recipes missing');
+          if(!m.includes('RECIPES.filter(r=>canCraftRecipe(r)&&(!TABLE_RECIPES.has(r.name)||openedCraftingStation))'))throw new Error('Material-filtered and crafting-table-gated recipes missing');
           if(!m.includes('function renderHotbar()')||!h.includes('id="hotbar"'))throw new Error('Hotbar missing');
           if(!m.includes('MANOS VACÍAS'))throw new Error('Empty-hand start is missing');
           if(!m.includes("e.code.startsWith('Digit')")||!m.includes("e.code==='KeyE'"))throw new Error('Inventory/hotbar keyboard controls missing');
