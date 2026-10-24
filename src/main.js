@@ -5,6 +5,7 @@ import {GAME_VERSION,SERVER_URL,HTTP_SERVER_URL} from './config.js';
 import {createVoxelWorld} from './voxel-world.js';
 
 const $=id=>document.getElementById(id);
+let toastTimer=0;function showToast(message){const el=$('toast');if(!el)return;el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),1900)}
 const isTouchDevice=('ontouchstart' in window)||navigator.maxTouchPoints>0||matchMedia('(pointer: coarse)').matches;
 const serverIsConfigured=!/YOUR-SUBDOMAIN|YOUR-TEKAYM/.test(SERVER_URL);
 const boot=$('boot'),bootStatus=$('bootStatus'),loginGate=$('loginGate'),loginStatus=$('loginStatus'),googleButton=$('googleButton'),gameMenu=$('gameMenu'),inventoryModal=$('inventoryModal'),recipeList=$('recipeList'),inventoryGrid=$('inventoryGrid'),hotbarEl=$('hotbar'); let gameStarted=false,selectedHotbar=0,hotbarSlots=Array(9).fill(null),worldSeed=7919;
@@ -204,7 +205,7 @@ function mineBlock(){
  const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
  const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
  const toolNeeded= id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
- if(toolNeeded&&!inventory[toolNeeded]){hint.textContent=toolNeeded==='pickaxe'?'Necesitas un pico de madera para picar piedra y carbón.':toolNeeded==='stonePickaxe'?'Necesitas un pico de piedra para extraer hierro.':'Necesitas un pico de hierro para extraer oro y diamante.';return;}
+ if(toolNeeded&&!inventory[toolNeeded]){showToast(toolNeeded==='pickaxe'?'La piedra y el carbón requieren un pico de madera.':toolNeeded==='stonePickaxe'?'El hierro requiere un pico de piedra.':'El oro y el diamante requieren un pico de hierro.');return;}
  const removed=voxelWorld.breakBlock(camera);if(!removed)return;
  const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE,[BLOCK.TORCH]:BLOCK.TORCH };
  const drop=drops[removed];if(drop!==undefined){inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0||inventory.ironAxe>0)?2:1);addToHotbar(drop)}
@@ -212,7 +213,7 @@ function mineBlock(){
  playSfx('mine');syncTorchLights();updateInventoryHud();saveWorld();
 }
 function placeSelectedBlock(){
- if(player.dead)return;const activeItem=hotbarSlots[selectedHotbar];if(!activeItem||!Number.isInteger(Number(activeItem))||Number(activeItem)<1||Number(activeItem)>14){hint.textContent='Selecciona un bloque en la barra rápida.';return;}selectedBlock=Number(activeItem);if((inventory[selectedBlock]||0)<1){hint.textContent='No tienes '+voxelWorld.blockName(selectedBlock)+' para colocar.';return;}
+ if(player.dead)return;const activeItem=hotbarSlots[selectedHotbar];if(!activeItem||!Number.isInteger(Number(activeItem))||Number(activeItem)<1||Number(activeItem)>14){showToast('Selecciona un bloque en la barra rápida para colocarlo.');return;}selectedBlock=Number(activeItem);if((inventory[selectedBlock]||0)<1){showToast('No tienes bloques de ese tipo para colocar.');return;}
  const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
  const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;
  if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position)){
