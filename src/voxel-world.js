@@ -260,17 +260,23 @@ export function createVoxelWorld(scene, seedValue=7919) {
     const bx = Math.floor(p.x - n.x * 0.01), by = Math.floor(p.y - n.y * 0.01), bz = Math.floor(p.z - n.z * 0.01);
     return { x: bx, y: by, z: bz, normal: { x: Math.round(n.x), y: Math.round(n.y), z: Math.round(n.z) }, point: hit.point.clone() };
   }
+  function breakBlockAt(x, y, z, expectedId = null) {
+    if (![x, y, z].every(Number.isFinite)) return false;
+    x = Math.floor(x); y = Math.floor(y); z = Math.floor(z);
+    if (y <= 0 || y >= MAX_Y) return false;
+    const id = getBlock(x, y, z);
+    if (!id || (expectedId !== null && id !== expectedId)) return false;
+    const k = key(x, y, z);
+    if (!changes.has(k)) originals.set(k, id);
+    putRaw(x, y, z, BLOCK.AIR);
+    changes.set(k, BLOCK.AIR);
+    rebuildAt(x, z);
+    return id;
+  }
   function breakBlock(camera, ndc = null) {
     const hit = targetFromCamera(camera, ndc);
     if (!hit) return false;
-    const id = getBlock(hit.x, hit.y, hit.z);
-    if (!id || hit.y <= 0) return false;
-    const k = key(hit.x, hit.y, hit.z);
-    if (!changes.has(k)) originals.set(k, getBlock(hit.x, hit.y, hit.z));
-    putRaw(hit.x, hit.y, hit.z, BLOCK.AIR);
-    changes.set(k, BLOCK.AIR);
-    rebuildAt(hit.x, hit.z);
-    return id;
+    return breakBlockAt(hit.x, hit.y, hit.z);
   }
   function placeBlock(camera, id = BLOCK.DIRT, playerPosition = null, ndc = null) {
     const hit = targetFromCamera(camera, ndc);
@@ -393,7 +399,7 @@ export function createVoxelWorld(scene, seedValue=7919) {
   }
 
   return {
-    group, BLOCK, getBlock, getHeightAt, breakBlock, placeBlock, targetFromCamera,
+    group, BLOCK, getBlock, getHeightAt, breakBlock, breakBlockAt, placeBlock, targetFromCamera,
     applyChanges, resetChanges, serializeChanges, blockName, updateStreaming,
     safeSpawn: findSafeSpawn,
     get spawn() { return findSafeSpawn(0, 0); },
