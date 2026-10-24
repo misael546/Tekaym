@@ -147,7 +147,7 @@ jobs:
           if(!main.includes('function syncTorchLights()')||!main.includes('function isTorchProtected'))throw new Error('Torch lighting or spawn protection missing');
           if(!voxel.includes('TORCH: 14')||!voxel.includes("14:'Antorcha'")||!voxel.includes('Coal appears in small connected veins'))throw new Error('Torch block or coal veins missing');
           if(!worker.includes('isTorchProtected(x, z)')||!worker.includes('block.id > 14'))throw new Error('Multiplayer torch support missing');
-          if(!html.includes('id="cookMeat"')||!html.includes('id="craftTorch"')||!html.includes('id="audioToggle"'))throw new Error('Survival controls missing');
+          if(!html.includes('id="recipeList"')||!html.includes('id="inventoryModal"')||!html.includes('id="audioToggle"'))throw new Error('Inventory crafting or audio controls missing');
           if(!fs.existsSync('capacitor.config.json')||!fs.existsSync('.github/workflows/build-android-apk.yml'))throw new Error('Android APK workflow/config missing');
           console.log('Survival systems and Android packaging checks passed');
           NODE
