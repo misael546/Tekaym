@@ -5,20 +5,20 @@ const RENDER_DISTANCE = typeof window !== 'undefined' && window.innerWidth <= 80
 const MAX_Y = 48;
 const BLOCK = Object.freeze({ AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6, COAL_ORE: 7, IRON_ORE: 8, GOLD_ORE: 9, DIAMOND_ORE: 10, PLANKS: 11, CRAFTING_TABLE: 12, FURNACE: 13, TORCH: 14 });
 const COLORS = {
-  [BLOCK.GRASS]: new THREE.Color(0x609447),
-  [BLOCK.DIRT]: new THREE.Color(0x79553a),
-  [BLOCK.STONE]: new THREE.Color(0x777c80),
-  [BLOCK.SAND]: new THREE.Color(0xc8b77a),
-  [BLOCK.WOOD]: new THREE.Color(0x79502e),
-  [BLOCK.LEAVES]: new THREE.Color(0x3e713b),
-  [BLOCK.COAL_ORE]: new THREE.Color(0x34383d),
-  [BLOCK.IRON_ORE]: new THREE.Color(0xb98f78),
-  [BLOCK.GOLD_ORE]: new THREE.Color(0xe3bd36),
-  [BLOCK.DIAMOND_ORE]: new THREE.Color(0x45d9d2),
-  [BLOCK.PLANKS]: new THREE.Color(0xb98a52),
-  [BLOCK.CRAFTING_TABLE]: new THREE.Color(0x8b5b32),
-  [BLOCK.FURNACE]: new THREE.Color(0x55565a),
-  [BLOCK.TORCH]: new THREE.Color(0xe9a24b)
+  [BLOCK.GRASS]: new THREE.Color(0x597342),
+  [BLOCK.DIRT]: new THREE.Color(0x6c4934),
+  [BLOCK.STONE]: new THREE.Color(0x77766f),
+  [BLOCK.SAND]: new THREE.Color(0xbda978),
+  [BLOCK.WOOD]: new THREE.Color(0x64452b),
+  [BLOCK.LEAVES]: new THREE.Color(0x365b32),
+  [BLOCK.COAL_ORE]: new THREE.Color(0x353633),
+  [BLOCK.IRON_ORE]: new THREE.Color(0x8d7768),
+  [BLOCK.GOLD_ORE]: new THREE.Color(0xbca45b),
+  [BLOCK.DIAMOND_ORE]: new THREE.Color(0x5caeaa),
+  [BLOCK.PLANKS]: new THREE.Color(0x98734b),
+  [BLOCK.CRAFTING_TABLE]: new THREE.Color(0x785032),
+  [BLOCK.FURNACE]: new THREE.Color(0x4b4b48),
+  [BLOCK.TORCH]: new THREE.Color(0xd7a05b)
 };
 const DIRECTIONS = [
   { n: [1, 0, 0], v: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
