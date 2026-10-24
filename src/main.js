@@ -44,7 +44,7 @@ const worldClockText=$('worldClock');let lastClockSave=0;
 const keys={w:false,a:false,s:false,d:false};
 let streamedChunkX=Infinity,streamedChunkZ=Infinity;
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false,grounded:true,jumpVelocity:0};
-let knife=null,handModel=null,heldVisual=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,lastP2PHeartbeat=0,googleReady=false,connected=false;
+let knife=null,handModel=null,heldVisual=null,heldSwing=0,blockParticles=[],socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,lastP2PHeartbeat=0,googleReady=false,connected=false;
 let p2pConnection=null,p2pRole=null,p2pRemoteId='p2p-guest',pendingP2PWorld=null;const p2pHostPeers=new Map();
 function disconnectMultiplayer(){
  if(p2pConnection){try{p2pConnection.close()}catch{}}
@@ -78,25 +78,42 @@ async function requestLandscape(){
 }
 function setKey(e,down){const c=e.code;if(c==='KeyW'||c==='ArrowUp')keys.w=down;else if(c==='KeyA'||c==='ArrowLeft')keys.a=down;else if(c==='KeyS'||c==='ArrowDown')keys.s=down;else if(c==='KeyD'||c==='ArrowRight')keys.d=down;else if(c==='ShiftLeft'||c==='ShiftRight')keys.shift=down;}
 function itemLabel(k){return ({'1':'Pasto','2':'Tierra','3':'Piedra','4':'Arena','5':'Tronco','6':'Hojas','7':'Carbón','8':'Mineral de hierro','9':'Mineral de oro','10':'Diamante','11':'Tablas','12':'Mesa de trabajo','13':'Horno','14':'Antorcha',planks:'Tablas',sticks:'Palos',coal:'Carbón',ironIngot:'Lingote de hierro',goldIngot:'Lingote de oro',pickaxe:'Pico de madera',stonePickaxe:'Pico de piedra',ironPickaxe:'Pico de hierro',axe:'Hacha de madera',stoneAxe:'Hacha de piedra',ironAxe:'Hacha de hierro',shovel:'Pala de madera',stoneShovel:'Pala de piedra',ironShovel:'Pala de hierro',sword:'Espada de madera',stoneSword:'Espada de piedra',ironSword:'Espada de hierro',rawBeef:'Carne cruda',rawPork:'Cerdo crudo',rawChicken:'Pollo crudo',cookedBeef:'Carne cocida',cookedPork:'Cerdo cocido',cookedChicken:'Pollo cocido',craftingTable:'Mesa de trabajo',furnace:'Horno',leather:'Cuero',feathers:'Plumas'})[String(k)]||'Objeto'}
-function itemGlyph(k){k=String(k);if(['5','11','planks'].includes(k))return '▦';if(['3','7','8','9','10'].includes(k))return '◆';if(['12','13','craftingTable','furnace'].includes(k))return '▧';if(k==='14')return '♨';if(k==='sticks')return '╱';if(k.toLowerCase().includes('pickaxe'))return '⛏';if(k.toLowerCase().includes('axe'))return '⚒';if(k.toLowerCase().includes('sword'))return '⚔';if(k.toLowerCase().includes('shovel'))return '⛏';if(/Beef|Pork|Chicken/.test(k))return '◈';return '■'}
+function itemGlyph(k){
+ k=String(k);const l=k.toLowerCase();
+ if(['1','2','3','4','5','6','7','8','9','10','11','12','13','14'].includes(k))return ({'1':'🌿','2':'🟫','3':'🪨','4':'🟨','5':'🪵','6':'🍃','7':'⚫','8':'⛏️','9':'🟡','10':'💎','11':'🪵','12':'🧰','13':'🔥','14':'🕯️'})[k];
+ if(l==='planks')return '🪵';if(l==='sticks')return '🪄';if(l==='coal')return '⚫';if(l.includes('pickaxe'))return '⛏️';if(l.includes('sword'))return '🗡️';if(l.includes('axe'))return '🪓';if(l.includes('shovel'))return '⛏️';if(l.includes('iron')&&l.includes('ingot'))return '🔩';if(l.includes('gold')&&l.includes('ingot'))return '🟡';if(/beef|pork|chicken/i.test(k))return '🍖';if(l==='craftingtable')return '🧰';if(l==='furnace')return '🔥';if(l==='leather')return '🟤';if(l==='feathers')return '🪶';return '◆';
+}
 function updateHeldItem(){
  if(!handModel)return;
- if(heldVisual){handModel.remove(heldVisual);heldVisual.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()});heldVisual=null}
- const g=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:0xd6a078,roughness:.92}),sleeve=new THREE.MeshStandardMaterial({color:0x536a84,roughness:.95});
- for(const x of [-.25,.25]){
-  const arm=new THREE.Mesh(new THREE.BoxGeometry(.13,.22,.14),sleeve);arm.position.set(x,-.27,-.53);g.add(arm);
-  const fist=new THREE.Mesh(new THREE.BoxGeometry(.105,.09,.105),skin);fist.position.set(x,-.14,-.55);g.add(fist);
- }
- const key=hotbarSlots[selectedHotbar];if(key){const k=String(key);
-  if(['1','2','3','4','5','6','7','8','9','10','11','12','13','14'].includes(k)){
-   const colors={1:0x609447,2:0x79553a,3:0x777c80,4:0xc8b77a,5:0x79502e,6:0x3e713b,7:0x34383d,8:0xb98f78,9:0xe3bd36,10:0x45d9d2,11:0xb98a52,12:0x8b5b32,13:0x55565a,14:0xe9a24b};
-   const block=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.16),new THREE.MeshStandardMaterial({color:colors[k]||0x999999,roughness:.85}));block.position.set(.28,-.12,-.61);g.add(block);
-  }else{
-   const handle=new THREE.Mesh(new THREE.BoxGeometry(.035,.22,.035),new THREE.MeshStandardMaterial({color:0x79502e,roughness:.9}));handle.position.set(.25,-.1,-.59);g.add(handle);
-   if(/sword|pickaxe|axe|shovel/.test(k)){const metal=k.toLowerCase().includes('iron')?0xbec7d1:k.toLowerCase().includes('stone')?0x777c80:0x9b7547;const tool=new THREE.Mesh(new THREE.BoxGeometry(k.includes('sword') ? .045 : .16,k.includes('sword') ? .24 : .06,.035),new THREE.MeshStandardMaterial({color:metal,metalness:.3,roughness:.6}));tool.position.set(.25,.02,-.59);g.add(tool)}
-  }
+ if(heldVisual){handModel.remove(heldVisual);heldVisual.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose()}});heldVisual=null}
+ const g=new THREE.Group(),mat=(color,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+ const sleeve=mat(0x426b8b),seam=mat(0x253f58),skin=mat(0xdba47c),shade=mat(0xb87955);
+ const arm=new THREE.Mesh(new THREE.BoxGeometry(.19,.31,.2),sleeve);arm.position.set(.34,-.34,-.49);arm.rotation.z=-.22;g.add(arm);
+ const cuff=new THREE.Mesh(new THREE.BoxGeometry(.195,.07,.205),seam);cuff.position.set(.365,-.205,-.515);cuff.rotation.z=-.22;g.add(cuff);
+ const hand=new THREE.Mesh(new THREE.BoxGeometry(.145,.145,.16),skin);hand.position.set(.385,-.13,-.56);hand.rotation.z=-.18;g.add(hand);
+ const thumb=new THREE.Mesh(new THREE.BoxGeometry(.06,.095,.075),shade);thumb.position.set(.31,-.145,-.51);thumb.rotation.z=.35;g.add(thumb);
+ const key=hotbarSlots[selectedHotbar];if(key){
+  const k=String(key),l=k.toLowerCase(),wood=mat(0x8a542e),woodLight=mat(0xb77a43),darkWood=mat(0x59361f),stone=mat(0x7e858b),iron=mat(0xc7d2da,.36,.62),gold=mat(0xe7bd42,.32,.55);
+  const pivot=new THREE.Group();pivot.position.set(.39,-.105,-.62);g.add(pivot);
+  const cube=(geo,m,pos,rot=null)=>{const o=new THREE.Mesh(geo,m);o.position.set(...pos);if(rot)o.rotation.set(...rot);pivot.add(o);return o};
+  if(/^([1-9]|1[0-4])$/.test(k)){
+   const c={1:0x609447,2:0x79553a,3:0x777c80,4:0xc8b77a,5:0x79502e,6:0x3e713b,7:0x34383d,8:0xb98f78,9:0xe3bd36,10:0x45d9d2,11:0xb98a52,12:0x8b5b32,13:0x55565a,14:0xe9a24b};
+   cube(new THREE.BoxGeometry(.19,.19,.19),[.82,1,.68,.55,.9,.76].map(v=>mat(new THREE.Color(c[k]||0x999999).multiplyScalar(v))),[0,.015,0]);
+   if(k==='12'){cube(new THREE.BoxGeometry(.195,.055,.195),woodLight,[0,.075,0]);for(const x of [-.045,.045])cube(new THREE.BoxGeometry(.018,.035,.19),darkWood,[x,.025,0])}
+   if(k==='13'){cube(new THREE.BoxGeometry(.07,.07,.012),mat(0x242629),[0,.01,.101]);cube(new THREE.BoxGeometry(.045,.045,.016),mat(0xffa33d),[0,.01,.111])}
+   if(k==='14'){cube(new THREE.BoxGeometry(.045,.12,.045),wood,[0,-.035,0]);cube(new THREE.BoxGeometry(.08,.07,.08),mat(0xffb23e,.4),[0,.055,0])}
+  }else if(l.includes('sword')){const blade=l.includes('iron')?iron:l.includes('stone')?stone:woodLight;cube(new THREE.BoxGeometry(.075,.28,.035),blade,[0,.105,0],[0,0,-.1]);cube(new THREE.BoxGeometry(.16,.035,.055),gold,[0,-.045,0]);cube(new THREE.BoxGeometry(.045,.12,.045),wood,[0,-.12,0]);cube(new THREE.BoxGeometry(.055,.04,.055),darkWood,[0,-.19,0])}
+  else if(l.includes('pickaxe')){const head=l.includes('iron')?iron:l.includes('stone')?stone:woodLight;cube(new THREE.BoxGeometry(.045,.27,.045),wood,[0,-.025,0],[0,0,-.12]);cube(new THREE.BoxGeometry(.25,.055,.055),head,[0,.105,0],[0,0,-.1]);cube(new THREE.BoxGeometry(.055,.09,.055),head,[-.095,.075,0],[0,0,-.42]);cube(new THREE.BoxGeometry(.055,.09,.055),head,[.095,.075,0],[0,0,.42])}
+  else if(l.includes('axe')){const head=l.includes('iron')?iron:l.includes('stone')?stone:woodLight;cube(new THREE.BoxGeometry(.045,.27,.045),wood,[0,-.025,0],[0,0,-.12]);cube(new THREE.BoxGeometry(.13,.16,.055),head,[.075,.075,0],[0,0,-.15]);cube(new THREE.BoxGeometry(.065,.08,.06),head,[.135,.02,0],[0,0,-.3])}
+  else if(l.includes('shovel')){const head=l.includes('iron')?iron:l.includes('stone')?stone:woodLight;cube(new THREE.BoxGeometry(.045,.27,.045),wood,[0,-.025,0],[0,0,-.1]);cube(new THREE.BoxGeometry(.11,.12,.055),head,[0,.13,0],[0,0,-.08])}
+  else{cube(new THREE.BoxGeometry(.045,.25,.045),wood,[0,-.02,0]);cube(new THREE.BoxGeometry(.16,.12,.06),l.includes('ingot')?(l.includes('gold')?gold:iron):woodLight,[0,.11,0])}
  }
  handModel.add(g);heldVisual=g;
+}
+function swingHeldItem(){heldSwing=1}
+function spawnBlockParticles(x,y,z,color){
+ for(let i=0;i<9;i++){const p=new THREE.Mesh(new THREE.BoxGeometry(.055+Math.random()*.055,.055+Math.random()*.055,.055+Math.random()*.055),new THREE.MeshLambertMaterial({color}));
+ p.position.set(x+.2+Math.random()*.6,y+.2+Math.random()*.6,z+.2+Math.random()*.6);p.userData.velocity=new THREE.Vector3((Math.random()-.5)*3,1+Math.random()*2.4,(Math.random()-.5)*3);p.userData.life=.38+Math.random()*.28;scene.add(p);blockParticles.push(p)}
 }
 function renderHotbar(){if(!hotbarEl)return;hotbarEl.innerHTML='';hotbarSlots.forEach((k,i)=>{const b=document.createElement('button');b.type='button';b.className='hotbarSlot'+(i===selectedHotbar?' active':'');b.innerHTML='<span class="slotNumber">'+(i+1)+'</span><span class="slotGlyph">'+(k?itemGlyph(k):'')+'</span>'+(k?'<span class="slotCount">'+(inventory[k]||0)+'</span>':'');b.addEventListener('click',()=>selectHotbar(i));hotbarEl.appendChild(b)});if(selectedText)selectedText.textContent=hotbarSlots[selectedHotbar]?'EN MANO: '+itemLabel(hotbarSlots[selectedHotbar]):'MANOS VACÍAS';updateHeldItem()}
 function selectHotbar(i){selectedHotbar=Math.max(0,Math.min(8,i));const k=hotbarSlots[selectedHotbar];if(k&&Number(k)>=1&&Number(k)<=14)selectedBlock=Number(k);renderHotbar();updateInventoryHud();saveWorld()}
@@ -189,39 +206,19 @@ function canOccupy(x,z,eyeY){
  return true;
 }
 function moveLocal(dt){
- const sprinting=keys.shift&&player.stamina>1;
- const speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2));
+ const sprinting=keys.shift&&player.stamina>1,speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2));
  const v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){
-  v.normalize();
-  const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;
-  const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
-  const pos=controls.object.position;
-  const next=pos.clone().addScaledVector(dir,speed*dt);
-  const limit=99900;
-  if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){
-   if(player.grounded){
-    const currentGround=voxelWorld.getHeightAt(pos.x,pos.z);
-    const targetGround=voxelWorld.getHeightAt(next.x,next.z);
-    next.y=currentGround;
-    // Minecraft-style auto-step: allow climbing a single block, but not walls.
-    if(targetGround>currentGround+.08&&targetGround-currentGround<=1.05){
-     const stepped=next.clone();stepped.y=targetGround;
-     if(canOccupy(stepped.x,stepped.z,stepped.y))controls.object.position.copy(stepped);
-    }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
-   }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
-  }
-  player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt);
+ if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y,dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw),pos=controls.object.position,next=pos.clone().addScaledVector(dir,speed*dt);
+  if(Math.abs(next.x)<99900&&Math.abs(next.z)<99900){if(player.grounded){const current=voxelWorld.getHeightAt(pos.x,pos.z),target=voxelWorld.getHeightAt(next.x,next.z);next.y=current;
+   if(target>current+.08&&target-current<=1.05){const step=next.clone();step.y=target;if(canOccupy(step.x,step.z,step.y))controls.object.position.copy(step)}
+   else if(target<current-.08){if(canOccupy(next.x,next.z,current)){controls.object.position.copy(next);player.grounded=false;player.jumpVelocity=0}}
+   else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
+  }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}
+  player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)
  }else player.stamina=Math.min(100,player.stamina+22*dt);
- const pos=controls.object.position,groundY=voxelWorld.getHeightAt(pos.x,pos.z);
- if(player.grounded){pos.y=groundY;player.jumpVelocity=0}
- else{
-  const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;
-  if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}
-  else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}
- }
- const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);
- if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
+ const pos=controls.object.position,ground=voxelWorld.getHeightAt(pos.x,pos.z);
+ if(player.grounded){pos.y=ground;player.jumpVelocity=0}else{const old=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=ground){pos.y=ground;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=old;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
+ const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
 }
 function updateNeeds(dt){
  if(currentWorldMeta.mode==='creative')return;
@@ -259,25 +256,20 @@ function loadRoomInventory(){
 }
 function updateInventoryHud(){if(inventoryText)inventoryText.textContent='Objetos: '+Object.values(inventory).reduce((a,v)=>a+(Number(v)||0),0);renderHotbar()}
 function mineBlock(ndc=null){
- if(player.dead)return;
- const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;
- const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
- const toolNeeded=currentWorldMeta.mode==='creative'?null:id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
- if(toolNeeded&&!inventory[toolNeeded]){showToast(toolNeeded==='pickaxe'?'La piedra y el carbón requieren un pico de madera.':toolNeeded==='stonePickaxe'?'El hierro requiere un pico de piedra.':'El oro y el diamante requieren un pico de hierro.');return;}
- const removed=voxelWorld.breakBlock(camera,ndc);if(!removed)return;
- const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE,[BLOCK.TORCH]:BLOCK.TORCH };
+ if(player.dead)return;const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
+ const need=currentWorldMeta.mode==='creative'?null:id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
+ if(need&&!inventory[need]){showToast(need==='pickaxe'?'La piedra y el carbón requieren un pico de madera.':need==='stonePickaxe'?'El hierro requiere un pico de piedra.':'El oro y el diamante requieren un pico de hierro.');return}
+ swingHeldItem();const removed=voxelWorld.breakBlock(camera,ndc);if(!removed)return;
+ const colors={1:0x609447,2:0x79553a,3:0x777c80,4:0xc8b77a,5:0x79502e,6:0x3e713b,7:0x34383d,8:0xb98f78,9:0xe3bd36,10:0x45d9d2,11:0xb98a52,12:0x8b5b32,13:0x55565a,14:0xe9a24b};spawnBlockParticles(hit.x,hit.y,hit.z,colors[removed]||0xaaaaaa);
+ const drops={[BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE,[BLOCK.TORCH]:BLOCK.TORCH};
  const drop=drops[removed];if(drop!==undefined&&currentWorldMeta.mode!=='creative'){inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0||inventory.ironAxe>0)?2:1);addToHotbar(drop)}
- sendBlockEdit({x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR});
- playSfx('mine');syncTorchLights();updateInventoryHud();saveWorld();
+ sendBlockEdit({x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR});playSfx('mine');syncTorchLights();updateInventoryHud();saveWorld();
 }
 function placeSelectedBlock(ndc=null){
- if(player.dead)return;const activeItem=hotbarSlots[selectedHotbar];if(!activeItem||!Number.isInteger(Number(activeItem))||Number(activeItem)<1||Number(activeItem)>14){showToast('Selecciona un bloque en la barra rápida para colocarlo.');return;}selectedBlock=Number(activeItem);if(currentWorldMeta.mode!=='creative'&&(inventory[selectedBlock]||0)<1){showToast('No tienes bloques de ese tipo para colocar.');return;}
- const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;
- const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;
- if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position,ndc)){
-  if(currentWorldMeta.mode!=='creative')inventory[selectedBlock]--;sendBlockEdit({x,y,z,id:selectedBlock});
-  playSfx(selectedBlock===BLOCK.TORCH?'torch':'place');syncTorchLights();updateInventoryHud();saveWorld();
- }
+ if(player.dead)return;const item=hotbarSlots[selectedHotbar];if(!item||!Number.isInteger(Number(item))||Number(item)<1||Number(item)>14){showToast('Selecciona un bloque en la barra rápida para colocarlo.');return}
+ selectedBlock=Number(item);if(currentWorldMeta.mode!=='creative'&&(inventory[selectedBlock]||0)<1){showToast('No tienes bloques de ese tipo para colocar.');return}
+ const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;swingHeldItem();
+ if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position,ndc)){if(currentWorldMeta.mode!=='creative')inventory[selectedBlock]--;sendBlockEdit({x,y,z,id:selectedBlock});spawnBlockParticles(x,y,z,{1:0x609447,2:0x79553a,3:0x777c80,4:0xc8b77a,5:0x79502e,6:0x3e713b,7:0x34383d,8:0xb98f78,9:0xe3bd36,10:0x45d9d2,11:0xb98a52,12:0x8b5b32,13:0x55565a,14:0xe9a24b}[selectedBlock]||0xaaaaaa);playSfx(selectedBlock===BLOCK.TORCH?'torch':'place');syncTorchLights();updateInventoryHud();saveWorld()}else showToast('No se puede colocar ahí: apunta a una cara libre del bloque.')
 }
 function selectNextBlock(){
  const ids=[BLOCK.DIRT,BLOCK.STONE,BLOCK.WOOD,BLOCK.SAND,BLOCK.GRASS,BLOCK.PLANKS,BLOCK.CRAFTING_TABLE,BLOCK.FURNACE,BLOCK.TORCH];
@@ -551,5 +543,5 @@ bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('No se pudo prepar
 function isNight(){return worldClock>=650&&worldClock<1150}
  function isDaylight(){return worldClock<650||worldClock>=1150}
  function updateDayCycle(dt){worldClock=(worldClock+dt)%1200;const phase=worldClock/1200*Math.PI*2,elevation=Math.sin(phase),day=THREE.MathUtils.clamp((elevation+.12)/.5,0,1),twilight=THREE.MathUtils.clamp(1-Math.abs(elevation)*4,0,1);const daylight=day*day*(3-2*day);const skyDay=new THREE.Color(0x8bc5e8),skyNight=new THREE.Color(0x071020),skyDawn=new THREE.Color(0xe99560),sky=new THREE.Color().copy(skyNight).lerp(skyDay,daylight).lerp(skyDawn,twilight*.42);scene.background.copy(sky);scene.fog.color.copy(sky);light.intensity=.08+daylight*1.55;light.color.set(isNight()?0x9bb8ed:0xffe2b8);light.position.set(Math.cos(phase)*45,Math.sin(phase)*42,16);hemi.intensity=.25+daylight*1.4;hemi.color.set(isNight()?0x536baf:0xb9e3ff);hemi.groundColor.set(isNight()?0x111a2a:0x4b613c);if(worldClockText){const label=worldClock<600?'DÍA':worldClock<650?'ATARDECER':worldClock<1150?'NOCHE':'AMANECER';const total=Math.floor(worldClock/1200*24*60),hh=String(Math.floor(total/60)).padStart(2,'0'),mm=String(total%60).padStart(2,'0');worldClockText.textContent=label+' · '+hh+':'+mm}const nowNight=isNight(),px=controls.object.position.x,py=controls.object.position.y,pz=controls.object.position.z;sunMesh.position.set(px+Math.cos(phase)*100,py+Math.sin(phase)*82,pz-55);moonMesh.position.set(px-Math.cos(phase)*92,py-Math.sin(phase)*76,pz-48);sunMesh.visible=!nowNight;moonMesh.visible=nowNight||worldClock>=600&&worldClock<650||worldClock>=1150;starField.position.set(px,py,pz);starField.visible=nowNight;if(nowNight&&!nightActive){nightActive=true;if(currentWorldMeta.mode!=='creative'&&currentWorldMeta.difficulty!=='peaceful'){let n=0;for(const z of zombies){if(n++>=7)break;z.position.copy(randomZombiePosition());z.userData.hp=45;z.visible=true}}}else if(!nowNight&&nightActive){nightActive=false;for(const z of zombies)z.visible=false}for(const z of zombies)if(!nowNight||currentWorldMeta.mode==='creative'||currentWorldMeta.difficulty==='peaceful')z.visible=false;updateAnimals(performance.now(),dt);}
- function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(gameStarted&&!player.dead){if(now-lastAutoSave>(Math.max(5,Math.min(60,Number(localStorage.getItem('tekaym-autosave-seconds'))||10))*1000)){saveWorld();lastAutoSave=now}updateDayCycle(dt);moveLocal(dt);updateNeeds(dt);updateFurnace(dt);player.cooldown=Math.max(0,player.cooldown-dt);for(const z of zombies){if(!z.visible)continue;for(const part of z.children){if(part.userData.isZombieArm)part.rotation.x=Math.sin(now*.006+part.userData.side)*.16}if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
+ function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(heldVisual){if(heldSwing>0){heldSwing=Math.max(0,heldSwing-dt*5.8);const swing=Math.sin((1-heldSwing)*Math.PI);heldVisual.rotation.x=-.45-swing*.95;heldVisual.rotation.z=-.12+swing*.16}else{heldVisual.rotation.x+=(-.45-heldVisual.rotation.x)*Math.min(1,dt*10);heldVisual.rotation.z+=(-.12-heldVisual.rotation.z)*Math.min(1,dt*10)}}for(let i=blockParticles.length-1;i>=0;i--){const p=blockParticles[i];p.userData.life-=dt;p.userData.velocity.y-=8*dt;p.position.addScaledVector(p.userData.velocity,dt);p.rotation.x+=dt*5;p.rotation.z+=dt*4;if(p.userData.life<=0){scene.remove(p);p.geometry.dispose();p.material.dispose();blockParticles.splice(i,1)}}if(gameStarted&&!player.dead){if(now-lastAutoSave>(Math.max(5,Math.min(60,Number(localStorage.getItem('tekaym-autosave-seconds'))||10))*1000)){saveWorld();lastAutoSave=now}updateDayCycle(dt);moveLocal(dt);updateNeeds(dt);updateFurnace(dt);player.cooldown=Math.max(0,player.cooldown-dt);for(const z of zombies){if(!z.visible)continue;for(const part of z.children){if(part.userData.isZombieArm)part.rotation.x=Math.sin(now*.006+part.userData.side)*.16}if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();renderHotbar();requestAnimationFrame(animate);
