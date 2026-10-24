@@ -32,7 +32,7 @@ function parseDescription(text, expectedType) {
   return value;
 }
 
-export function createDirectHost({ onMessage, onOpen, onClose }) {
+export function createDirectHost({ peerId, onMessage, onOpen, onClose }) {
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   const channel = pc.createDataChannel('tekaym-world', { ordered: true });
   wireChannel(channel, onMessage, onOpen, onClose);
@@ -43,13 +43,15 @@ export function createDirectHost({ onMessage, onOpen, onClose }) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await waitForIce(pc);
-    return JSON.stringify(pc.localDescription);
+    return JSON.stringify({type:pc.localDescription.type,sdp:pc.localDescription.sdp,peerId});
   })();
   return {
     pc,
     ready,
     async acceptAnswer(answerText) {
-      await pc.setRemoteDescription(parseDescription(answerText, 'answer'));
+      const answer = parseDescription(answerText, 'answer');
+      if (answer.peerId && peerId && answer.peerId !== peerId) throw new Error('Esta respuesta pertenece a otra invitación. Usa la respuesta correcta.');
+      await pc.setRemoteDescription({type:answer.type,sdp:answer.sdp});
     },
     send(message) {
       if (channel.readyState !== 'open') return false;
@@ -69,11 +71,12 @@ export async function createDirectGuest(offerText, { onMessage, onOpen, onClose 
     pc._tekaymChannel = event.channel;
     wireChannel(event.channel, onMessage, onOpen, onClose);
   }, { once: true });
-  await pc.setRemoteDescription(parseDescription(offerText, 'offer'));
+  const offer = parseDescription(offerText, 'offer');
+  await pc.setRemoteDescription({type:offer.type,sdp:offer.sdp});
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitForIce(pc);
-  const answerText = JSON.stringify(pc.localDescription);
+  const answerText = JSON.stringify({type:pc.localDescription.type,sdp:pc.localDescription.sdp,peerId:offer.peerId});
   return {
     pc,
     answerText,
