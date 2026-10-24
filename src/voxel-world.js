@@ -244,8 +244,8 @@ export function createVoxelWorld(scene, seedValue=7919) {
     if (z - cz * CHUNK_SIZE === 0) buildChunk(cx, cz - 1);
     if (z - cz * CHUNK_SIZE === CHUNK_SIZE - 1) buildChunk(cx, cz + 1);
   }
-  function targetFromCamera(camera) {
-    raycaster.setFromCamera(center, camera);
+  function targetFromCamera(camera, ndc = null) {
+    raycaster.setFromCamera(ndc && Number.isFinite(ndc.x) && Number.isFinite(ndc.y) ? ndc : center, camera);
     const hit = raycaster.intersectObjects(Array.from(chunks.values()), false)[0];
     if (!hit || !hit.face) return null;
     const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
@@ -253,8 +253,8 @@ export function createVoxelWorld(scene, seedValue=7919) {
     const bx = Math.floor(p.x - n.x * 0.01), by = Math.floor(p.y - n.y * 0.01), bz = Math.floor(p.z - n.z * 0.01);
     return { x: bx, y: by, z: bz, normal: { x: Math.round(n.x), y: Math.round(n.y), z: Math.round(n.z) }, point: hit.point.clone() };
   }
-  function breakBlock(camera) {
-    const hit = targetFromCamera(camera);
+  function breakBlock(camera, ndc = null) {
+    const hit = targetFromCamera(camera, ndc);
     if (!hit) return false;
     const id = getBlock(hit.x, hit.y, hit.z);
     if (!id || hit.y <= 0) return false;
@@ -265,8 +265,8 @@ export function createVoxelWorld(scene, seedValue=7919) {
     rebuildAt(hit.x, hit.z);
     return id;
   }
-  function placeBlock(camera, id = BLOCK.DIRT, playerPosition = null) {
-    const hit = targetFromCamera(camera);
+  function placeBlock(camera, id = BLOCK.DIRT, playerPosition = null, ndc = null) {
+    const hit = targetFromCamera(camera, ndc);
     if (!hit) return false;
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
     if (getBlock(x, y, z) !== BLOCK.AIR || y <= 0 || y >= MAX_Y) return false;

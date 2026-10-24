@@ -100,8 +100,8 @@ function canCraftRecipe(r){return Object.entries(r.cost).every(([k,n])=>(invento
 function renderInventory(){if(!inventoryGrid||!recipeList)return;inventoryGrid.innerHTML='';const keys=Object.keys(inventory).filter(k=>(inventory[k]||0)>0);if(!keys.length)inventoryGrid.innerHTML='<div class="emptyInventory">Tu inventario está vacío. Tala un árbol para empezar.</div>';for(const k of keys){const b=document.createElement('button');b.className='inventoryItem';b.type='button';b.innerHTML='<span>'+itemGlyph(k)+'</span><b>'+itemLabel(k)+'</b><small>×'+inventory[k]+'</small>';b.addEventListener('click',()=>{let i=hotbarSlots.indexOf(String(k));if(i<0){i=hotbarSlots.findIndex(v=>!v);if(i>=0)hotbarSlots[i]=String(k)}if(i>=0)selectHotbar(i);renderInventory()});inventoryGrid.appendChild(b)}recipeList.innerHTML='';const avail=RECIPES.filter(canCraftRecipe);if(!avail.length)recipeList.innerHTML='<div class="emptyInventory">Las recetas aparecerán cuando tengas todos sus materiales.</div>';for(const r of avail){const b=document.createElement('button');b.className='recipeItem';b.type='button';b.innerHTML='<span class="recipeGlyph">'+itemGlyph(r.out)+'</span><span><b>'+r.name+'</b><small>'+Object.entries(r.cost).map(([k,n])=>itemLabel(k)+' '+n).join(' · ')+'</small></span><strong>FABRICAR</strong>';b.addEventListener('click',()=>{if(craftRecipe(r.cost,r.out,r.amount,r.name)){addToHotbar(r.out);renderInventory();renderHotbar()}});recipeList.appendChild(b)}}
 function openInventory(){if(!gameStarted)return;renderInventory();inventoryModal?.classList.remove('hidden');if(innerWidth>800&&controls.isLocked)controls.unlock()}
 function closeInventory(){inventoryModal?.classList.add('hidden')}
-function beginLocalWorld(isNew){disconnectMultiplayer();if(isTouchDevice)requestLandscape();gameStarted=true;loginGate.classList.add('hidden');gameMenu.classList.add('hidden');inventoryModal?.classList.add('hidden');$('hud').style.display='block';$('touch').style.display='';if(isNew){worldSeed=Math.floor(Math.random()*2147483000)+1;voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);for(const k of Object.keys(inventory))inventory[k]=0;hotbarSlots=Array(9).fill(null);selectedHotbar=0;selectedBlock=BLOCK.DIRT;furnaceQueue=[];furnaceProgress=0;worldClock=0;player.hp=player.maxHp;player.stamina=100;player.hunger=100;player.thirst=100;player.grounded=true;player.jumpVelocity=0;activeRoomCode='local-'+Date.now().toString(36);controls.object.position.copy(voxelWorld.safeSpawn());camera.rotation.set(0,0,0);lookYaw=lookPitch=0;}else{player.grounded=true;player.jumpVelocity=0;activeRoomCode=localStorage.getItem('tekaym-last-world')||'local-default';try{const saved=JSON.parse(localStorage.getItem(roomSaveKey())||'null');if(Number.isFinite(Number(saved?.worldSeed))&&Number(saved.worldSeed)!==worldSeed){worldSeed=Number(saved.worldSeed);voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);controls.object.position.copy(voxelWorld.safeSpawn())}if(saved?.blocks)voxelWorld.applyChanges(saved.blocks);if(saved?.playerPosition&&Number.isFinite(Number(saved.playerPosition.x))&&Number.isFinite(Number(saved.playerPosition.z)))controls.object.position.set(Number(saved.playerPosition.x),Number(saved.playerPosition.y)||voxelWorld.getHeightAt(Number(saved.playerPosition.x),Number(saved.playerPosition.z)),Number(saved.playerPosition.z));if(saved?.inventory)for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(saved.inventory[k])||0));if(Array.isArray(saved?.hotbarSlots))hotbarSlots=saved.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);selectedHotbar=Number(saved?.selectedHotbar)||0;selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;worldClock=Number(saved?.worldClock)||0;furnaceQueue=Array.isArray(saved?.furnaceQueue)?saved.furnaceQueue:[];furnaceProgress=Number(saved?.furnaceProgress)||0;}catch(e){console.warn('No se pudo cargar el mundo',e)}}localStorage.setItem('tekaym-last-world',activeRoomCode);voxelWorld.updateStreaming(controls.object.position);streamedChunkX=Math.floor(controls.object.position.x/16);streamedChunkZ=Math.floor(controls.object.position.z/16);syncTorchLights();renderHotbar();spawnProceduralZombies(18);updateInventoryHud();saveWorld();zoneText.textContent=activeRoomCode.startsWith('local-')?'MUNDO LOCAL':'MUNDO '+activeRoomCode;hint.textContent=''}
-function showGameMenu(){if(gameStarted)saveWorld();gameStarted=false;disconnectMultiplayer();gameMenu?.classList.remove('hidden');$('hud').style.display='none';$('touch').style.display='none';inventoryModal?.classList.add('hidden')}
+function beginLocalWorld(isNew,worldConfig=null){disconnectMultiplayer();if(isTouchDevice)requestLandscape();gameStarted=true;loginGate.classList.add('hidden');gameMenu.classList.add('hidden');$('worldCreateModal')?.classList.add('hidden');$('settingsModal')?.classList.add('hidden');inventoryModal?.classList.add('hidden');$('hud').style.display='block';$('touch').style.display='';if(isNew){worldSeed=Number.isFinite(Number(worldConfig?.seed))&&String(worldConfig?.seed).trim()!==''?Number(worldConfig.seed):Math.floor(Math.random()*2147483000)+1;activeRoomCode=worldConfig?.id||'local-'+Date.now().toString(36);currentWorldMeta={id:activeRoomCode,name:worldConfig?.name||'Mi mundo',seed:worldSeed,mode:worldConfig?.mode||'survival',difficulty:worldConfig?.difficulty||'normal',updatedAt:Date.now()};voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);for(const k of Object.keys(inventory))inventory[k]=0;hotbarSlots=Array(9).fill(null);selectedHotbar=0;selectedBlock=BLOCK.DIRT;if(currentWorldMeta.mode==='creative'){hotbarSlots=[1,2,3,4,5,6,7,8,9];for(let id=1;id<=9;id++)inventory[id]=9999;}furnaceQueue=[];furnaceProgress=0;worldClock=0;player.hp=player.maxHp;player.stamina=100;player.hunger=100;player.thirst=100;player.grounded=true;player.jumpVelocity=0;controls.object.position.copy(voxelWorld.safeSpawn());camera.rotation.set(0,0,0);lookYaw=lookPitch=0;}else{player.grounded=true;player.jumpVelocity=0;activeRoomCode=worldConfig?.id||localStorage.getItem('tekaym-last-world')||'local-default';currentWorldMeta={...currentWorldMeta,...(worldConfig||{}),id:activeRoomCode};try{const saved=JSON.parse(localStorage.getItem(roomSaveKey())||'null');if(Number.isFinite(Number(saved?.worldSeed))){worldSeed=Number(saved.worldSeed);voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);controls.object.position.copy(voxelWorld.safeSpawn())}if(saved?.blocks)voxelWorld.applyChanges(saved.blocks);if(saved?.playerPosition&&Number.isFinite(Number(saved.playerPosition.x))&&Number.isFinite(Number(saved.playerPosition.z)))controls.object.position.set(Number(saved.playerPosition.x),Number(saved.playerPosition.y)||voxelWorld.getHeightAt(Number(saved.playerPosition.x),Number(saved.playerPosition.z)),Number(saved.playerPosition.z));if(saved?.inventory)for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(saved.inventory[k])||0));if(Array.isArray(saved?.hotbarSlots))hotbarSlots=saved.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);selectedHotbar=Number(saved?.selectedHotbar)||0;selectedBlock=Number(saved?.selectedBlock)||BLOCK.DIRT;worldClock=Number(saved?.worldClock)||0;currentWorldMeta={...currentWorldMeta,name:saved?.worldName||currentWorldMeta.name,seed:worldSeed,mode:saved?.gameMode||currentWorldMeta.mode,difficulty:saved?.difficulty||currentWorldMeta.difficulty};furnaceQueue=Array.isArray(saved?.furnaceQueue)?saved.furnaceQueue:[];furnaceProgress=Number(saved?.furnaceProgress)||0;}catch(e){console.warn('No se pudo cargar el mundo',e)}}localStorage.setItem('tekaym-last-world',activeRoomCode);voxelWorld.updateStreaming(controls.object.position);streamedChunkX=Math.floor(controls.object.position.x/16);streamedChunkZ=Math.floor(controls.object.position.z/16);syncTorchLights();renderHotbar();spawnProceduralZombies(18);updateInventoryHud();saveWorld();zoneText.textContent=activeRoomCode.startsWith('local-')?'MUNDO LOCAL':'MUNDO '+activeRoomCode;hint.textContent=''}
+function showGameMenu(){if(gameStarted)saveWorld();gameStarted=false;disconnectMultiplayer();gameMenu?.classList.remove('hidden');$('hud').style.display='none';$('touch').style.display='none';$('touchAimSphere').style.display='none';inventoryModal?.classList.add('hidden');renderSavedWorlds()}
 
 function audioReady(){if(!audioContext){const C=window.AudioContext||window.webkitAudioContext;if(C)audioContext=new C()}if(audioContext?.state==='suspended')audioContext.resume().catch(()=>{});return audioContext}
 function playTone(freq=220,duration=.09,volume=.035,wave='triangle'){const ac=audioReady();if(!ac)return;const osc=ac.createOscillator(),gain=ac.createGain();osc.type=wave;osc.frequency.setValueAtTime(freq,ac.currentTime);gain.gain.setValueAtTime(.0001,ac.currentTime);gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),ac.currentTime+.012);gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+duration);osc.connect(gain);gain.connect(ac.destination);osc.start();osc.stop(ac.currentTime+duration+.025)}
@@ -128,17 +128,26 @@ function randomNearPlayer(min=10,max=28){
  const x=Math.floor(controls.object.position.x+min),z=Math.floor(controls.object.position.z),h=voxelWorld.getHeightAt(x,z);return new THREE.Vector3(x,h-1.65,z);
 }
 function randomZombiePosition(){let p;for(let i=0;i<24;i++){p=randomNearPlayer(24,32);if(!isTorchProtected(Math.floor(p.x),Math.floor(p.z)))break}p.y=voxelWorld.getHeightAt(p.x,p.z)-1.65;return p}
+function makePixelNoiseTexture(seed=1){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=16;
+ const ctx=canvas.getContext('2d');const palette=['#ffffff','#e5e5e5','#c8c8c8','#f5f5f5','#b8b8b8'];
+ let n=seed>>>0;const random=()=>{n=(n*1664525+1013904223)>>>0;return n/4294967296};
+ for(let y=0;y<16;y++)for(let x=0;x<16;x++){ctx.fillStyle=palette[Math.floor(random()*palette.length)];ctx.fillRect(x,y,1,1)}
+ const texture=new THREE.CanvasTexture(canvas);texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;texture.colorSpace=THREE.SRGBColorSpace;return texture;
+}
 function spawnProceduralZombies(count){
+ count=currentWorldMeta.mode==='creative'||currentWorldMeta.difficulty==='peaceful'?0:currentWorldMeta.difficulty==='easy'?8:currentWorldMeta.difficulty==='hard'?24:18;
  for(let i=0;i<count;i++){
   let z=zombies[i];
   if(!z){
    z=new THREE.Group();
-   const shirt=new THREE.MeshStandardMaterial({color:0x477a52,roughness:1});const torso=new THREE.Mesh(new THREE.BoxGeometry(.58,.78,.3),shirt);torso.position.y=.94;z.add(torso);
-   const skin=new THREE.MeshStandardMaterial({color:0x6f9a55,roughness:1}),white=new THREE.MeshStandardMaterial({color:0xe6e3d8,roughness:1}),pupil=new THREE.MeshStandardMaterial({color:0x201b18,roughness:1});const head=new THREE.Mesh(new THREE.BoxGeometry(.46,.46,.42),skin);head.position.set(0,1.58,0);z.add(head);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.09,.055,.025),white);eye.position.set(x,1.62,.222);z.add(eye);const dot=new THREE.Mesh(new THREE.BoxGeometry(.035,.045,.012),pupil);dot.position.set(x,1.62,.24);z.add(dot)}for(const x of [-.39,.39]){const arm=new THREE.Mesh(new THREE.BoxGeometry(.2,.68,.22),skin);arm.position.set(x,.97,0);arm.userData.isZombieArm=true;arm.userData.side=x;z.add(arm)}const pants=new THREE.MeshStandardMaterial({color:0x303e8b,roughness:1});for(const x of [-.16,.16]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.23,.55,.25),pants);leg.position.set(x,.28,0);z.add(leg)}
+   const shirt=new THREE.MeshStandardMaterial({color:0x477a52,roughness:1,map:makePixelNoiseTexture(17)});const torso=new THREE.Mesh(new THREE.BoxGeometry(.58,.78,.3),shirt);torso.position.y=.94;z.add(torso);
+   const skin=new THREE.MeshStandardMaterial({color:0x6f9a55,roughness:1,map:makePixelNoiseTexture(29)}),white=new THREE.MeshStandardMaterial({color:0xe6e3d8,roughness:1}),pupil=new THREE.MeshStandardMaterial({color:0x201b18,roughness:1});const head=new THREE.Mesh(new THREE.BoxGeometry(.46,.46,.42),skin);head.position.set(0,1.58,0);z.add(head);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.09,.055,.025),white);eye.position.set(x,1.62,.222);z.add(eye);const dot=new THREE.Mesh(new THREE.BoxGeometry(.035,.045,.012),pupil);dot.position.set(x,1.62,.24);z.add(dot)}for(const x of [-.39,.39]){const arm=new THREE.Mesh(new THREE.BoxGeometry(.2,.68,.22),skin);arm.position.set(x,.97,0);arm.userData.isZombieArm=true;arm.userData.side=x;z.add(arm)}const pants=new THREE.MeshStandardMaterial({color:0x303e8b,roughness:1,map:makePixelNoiseTexture(43)});for(const x of [-.16,.16]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.23,.55,.25),pants);leg.position.set(x,.28,0);z.add(leg)}
    zombies.push(z);scene.add(z);
   }
   z.position.copy(randomZombiePosition());
-  z.userData={id:'z'+i,hp:45,speed:1.05+Math.random()*.5,phase:Math.random()*6.28};
+  const difficultySpeed=currentWorldMeta.difficulty==='easy'?.8:currentWorldMeta.difficulty==='hard'?1.3:1;
+  z.userData={id:'z'+i,hp:45,speed:(1.05+Math.random()*.5)*difficultySpeed,phase:Math.random()*6.28};
   z.visible=false;
   if(z.parent!==scene)scene.add(z);
  }
@@ -146,6 +155,7 @@ function spawnProceduralZombies(count){
 }
 function makeAnimal(type){
  const root=new THREE.Group(),mat=(color)=>new THREE.MeshStandardMaterial({color,roughness:.9}),coat=mat(type==='cow'?0xe8e1d5:type==='pig'?0xeaa0a0:0xf3f0e5),dark=mat(0x42352d),pink=mat(0xf08e96),yellow=mat(0xe8b52d),red=mat(0xb52e39);
+ coat.map=makePixelNoiseTexture(type==='cow'?53:type==='pig'?67:79);coat.needsUpdate=true;
  const size=type==='cow'?[.78,.66,1.05]:type==='pig'?[.72,.5,.9]:[.4,.4,.52],body=new THREE.Mesh(new THREE.BoxGeometry(...size),coat);body.position.y=type==='chicken'?.48:.62;root.add(body);
  if(type==='cow'){for(const [x,y,z] of [[-.2,.72,.12],[.2,.48,-.18]]){const patch=new THREE.Mesh(new THREE.BoxGeometry(.2,.2,.18),dark);patch.position.set(x,y,z);root.add(patch)}}
  const head=new THREE.Mesh(new THREE.BoxGeometry(type==='cow'?.38:.31,type==='chicken'?.28:type==='cow'?.34:.29,.34),coat);head.position.set(0,type==='chicken'?.76:.83,.44);root.add(head);const eyeMat=mat(0x171717),eyeWhite=mat(0xf5f1df);for(const x of [-.105,.105]){const eye=new THREE.Mesh(new THREE.BoxGeometry(.055,.06,.025),eyeWhite);eye.position.set(x,type==='chicken'?.79:.87,.615);root.add(eye);const pupil=new THREE.Mesh(new THREE.BoxGeometry(.025,.04,.012),eyeMat);pupil.position.set(x,type==='chicken'?.79:.87,.633);root.add(pupil)}if(type==='cow'){for(const x of [-.24,.24]){const horn=new THREE.Mesh(new THREE.BoxGeometry(.08,.16,.08),coat);horn.position.set(x,1.02,.42);root.add(horn)}}if(type==='pig'){for(const x of [-.12,.12]){const nostril=new THREE.Mesh(new THREE.BoxGeometry(.035,.04,.015),dark);nostril.position.set(x,.8,.685);root.add(nostril)}}
@@ -174,21 +184,64 @@ function canOccupy(x,z,eyeY){
  return true;
 }
 function moveLocal(dt){
- const sprinting=keys.shift&&player.stamina>1;const speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2)),v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=99900;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){if(player.grounded)next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else player.stamina=Math.min(100,player.stamina+22*dt);
+ const sprinting=keys.shift&&player.stamina>1;
+ const speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2));
+ const v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
+ if(v.lengthSq()){
+  v.normalize();
+  const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;
+  const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+  const pos=controls.object.position;
+  const next=pos.clone().addScaledVector(dir,speed*dt);
+  const limit=99900;
+  if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){
+   if(player.grounded){
+    const currentGround=voxelWorld.getHeightAt(pos.x,pos.z);
+    const targetGround=voxelWorld.getHeightAt(next.x,next.z);
+    next.y=currentGround;
+    // Minecraft-style auto-step: allow climbing a single block, but not walls.
+    if(targetGround>currentGround+.08&&targetGround-currentGround<=1.05){
+     const stepped=next.clone();stepped.y=targetGround;
+     if(canOccupy(stepped.x,stepped.z,stepped.y))controls.object.position.copy(stepped);
+    }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
+   }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
+  }
+  player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt);
+ }else player.stamina=Math.min(100,player.stamina+22*dt);
  const pos=controls.object.position,groundY=voxelWorld.getHeightAt(pos.x,pos.z);
  if(player.grounded){pos.y=groundY;player.jumpVelocity=0}
- else{const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
- const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
+ else{
+  const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;
+  if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}
+  else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}
+ }
+ const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);
+ if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
 }
 function updateNeeds(dt){
+ if(currentWorldMeta.mode==='creative')return;
  player.hunger=Math.max(0,player.hunger-.18*dt);player.thirst=Math.max(0,player.thirst-.26*dt);
  if(player.hunger===0||player.thirst===0)player.hp=Math.max(0,player.hp-.8*dt);
  if(player.hp<=0&&!player.dead){player.dead=true;setBoot('Has muerto. Recargando…');boot.classList.remove('hidden');setTimeout(()=>location.reload(),1200)}
 }
 function roomSaveKey(){return 'tekaym-voxel-save-v2-'+activeRoomCode}
+const WORLD_LIST_KEY='tekaym-saved-worlds-v1';
+function getSavedWorlds(){try{const v=JSON.parse(localStorage.getItem(WORLD_LIST_KEY)||'[]');return Array.isArray(v)?v.filter(w=>w&&typeof w.id==='string'):[]}catch{return []}}
+function putSavedWorld(meta){const list=getSavedWorlds().filter(w=>w.id!==meta.id);list.unshift({...meta,updatedAt:Date.now()});try{localStorage.setItem(WORLD_LIST_KEY,JSON.stringify(list.slice(0,30)))}catch(e){console.warn('[TEKAYM] No se pudo actualizar la lista de mundos',e)}}
+function renderSavedWorlds(){
+ const list=$('savedWorldList');if(!list)return;const worlds=getSavedWorlds();list.replaceChildren();
+ if(!worlds.length){const empty=document.createElement('div');empty.className='settingsNote';empty.textContent='Todavía no tienes mundos guardados.';list.append(empty)}
+ for(const w of worlds){const card=document.createElement('div');card.className='savedWorld';const info=document.createElement('div');info.className='savedWorldInfo';const title=document.createElement('strong');title.textContent=w.name||'Mi mundo';const details=document.createElement('small');details.textContent='Semilla: '+(w.seed??'aleatoria')+' · '+(w.mode==='creative'?'Creativo':'Supervivencia')+' · '+new Date(w.updatedAt||Date.now()).toLocaleDateString();info.append(title,details);const play=document.createElement('button');play.type='button';play.textContent='JUGAR';play.addEventListener('click',()=>beginLocalWorld(false,w));card.append(info,play);list.append(card)}
+ const last=localStorage.getItem('tekaym-last-world');const cont=$('continueWorldButton');if(cont)cont.disabled=!worlds.some(w=>w.id===last);
+ const status=$('menuStatus');if(status)status.textContent=worlds.length?worlds.length+' mundo(s) guardado(s) en este dispositivo.':'Crea tu primer mundo para empezar.';
+}
+let currentWorldMeta={id:'local-default',name:'Mi mundo',seed:7919,mode:'survival',difficulty:'normal'};
 function saveWorld(){
- try{localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,selectedHotbar,hotbarSlots,worldSeed,playerPosition:{x:controls.object.position.x,y:controls.object.position.y,z:controls.object.position.z},worldClock,furnaceQueue,furnaceProgress,updatedAt:Date.now()}));}catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
+ try{
+  const meta={...currentWorldMeta,id:activeRoomCode||currentWorldMeta.id,seed:worldSeed,updatedAt:Date.now()};
+  currentWorldMeta=meta;putSavedWorld(meta);
+  localStorage.setItem(roomSaveKey(),JSON.stringify({blocks:voxelWorld.serializeChanges(),inventory,selectedBlock,selectedHotbar,hotbarSlots,worldSeed,worldName:meta.name,gameMode:meta.mode,difficulty:meta.difficulty,playerPosition:{x:controls.object.position.x,y:controls.object.position.y,z:controls.object.position.z},worldClock,furnaceQueue,furnaceProgress,updatedAt:Date.now()}));
+ }catch(e){console.warn('[TEKAYM] No se pudo guardar el mundo',e)}
 }
 function loadRoomInventory(){
  try{
@@ -200,24 +253,24 @@ function loadRoomInventory(){
  updateInventoryHud();
 }
 function updateInventoryHud(){if(inventoryText)inventoryText.textContent='Objetos: '+Object.values(inventory).reduce((a,v)=>a+(Number(v)||0),0);renderHotbar()}
-function mineBlock(){
+function mineBlock(ndc=null){
  if(player.dead)return;
- const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
+ const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;
  const id=voxelWorld.getBlock(hit.x,hit.y,hit.z);if(!id)return;
- const toolNeeded= id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
+ const toolNeeded=currentWorldMeta.mode==='creative'?null:id===BLOCK.STONE||id===BLOCK.COAL_ORE?'pickaxe':id===BLOCK.IRON_ORE?'stonePickaxe':id===BLOCK.GOLD_ORE||id===BLOCK.DIAMOND_ORE?'ironPickaxe':null;
  if(toolNeeded&&!inventory[toolNeeded]){showToast(toolNeeded==='pickaxe'?'La piedra y el carbón requieren un pico de madera.':toolNeeded==='stonePickaxe'?'El hierro requiere un pico de piedra.':'El oro y el diamante requieren un pico de hierro.');return;}
- const removed=voxelWorld.breakBlock(camera);if(!removed)return;
+ const removed=voxelWorld.breakBlock(camera,ndc);if(!removed)return;
  const drops={ [BLOCK.GRASS]:BLOCK.DIRT,[BLOCK.DIRT]:BLOCK.DIRT,[BLOCK.STONE]:BLOCK.STONE,[BLOCK.SAND]:BLOCK.SAND,[BLOCK.WOOD]:BLOCK.WOOD,[BLOCK.LEAVES]:BLOCK.LEAVES,[BLOCK.COAL_ORE]:'coal',[BLOCK.IRON_ORE]:BLOCK.IRON_ORE,[BLOCK.GOLD_ORE]:BLOCK.GOLD_ORE,[BLOCK.DIAMOND_ORE]:BLOCK.DIAMOND_ORE,[BLOCK.PLANKS]:BLOCK.PLANKS,[BLOCK.CRAFTING_TABLE]:BLOCK.CRAFTING_TABLE,[BLOCK.FURNACE]:BLOCK.FURNACE,[BLOCK.TORCH]:BLOCK.TORCH };
- const drop=drops[removed];if(drop!==undefined){inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0||inventory.ironAxe>0)?2:1);addToHotbar(drop)}
+ const drop=drops[removed];if(drop!==undefined&&currentWorldMeta.mode!=='creative'){inventory[drop]=(inventory[drop]||0)+(removed===BLOCK.WOOD&&(inventory.axe>0||inventory.stoneAxe>0||inventory.ironAxe>0)?2:1);addToHotbar(drop)}
  if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x:hit.x,y:hit.y,z:hit.z,id:BLOCK.AIR}));
  playSfx('mine');syncTorchLights();updateInventoryHud();saveWorld();
 }
-function placeSelectedBlock(){
- if(player.dead)return;const activeItem=hotbarSlots[selectedHotbar];if(!activeItem||!Number.isInteger(Number(activeItem))||Number(activeItem)<1||Number(activeItem)>14){showToast('Selecciona un bloque en la barra rápida para colocarlo.');return;}selectedBlock=Number(activeItem);if((inventory[selectedBlock]||0)<1){showToast('No tienes bloques de ese tipo para colocar.');return;}
- const hit=voxelWorld.targetFromCamera(camera);if(!hit)return;
+function placeSelectedBlock(ndc=null){
+ if(player.dead)return;const activeItem=hotbarSlots[selectedHotbar];if(!activeItem||!Number.isInteger(Number(activeItem))||Number(activeItem)<1||Number(activeItem)>14){showToast('Selecciona un bloque en la barra rápida para colocarlo.');return;}selectedBlock=Number(activeItem);if(currentWorldMeta.mode!=='creative'&&(inventory[selectedBlock]||0)<1){showToast('No tienes bloques de ese tipo para colocar.');return;}
+ const hit=voxelWorld.targetFromCamera(camera,ndc);if(!hit)return;
  const x=hit.x+hit.normal.x,y=hit.y+hit.normal.y,z=hit.z+hit.normal.z;
- if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position)){
-  inventory[selectedBlock]--;if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x,y,z,id:selectedBlock}));
+ if(voxelWorld.placeBlock(camera,selectedBlock,controls.object.position,ndc)){
+  if(currentWorldMeta.mode!=='creative')inventory[selectedBlock]--;if(socket?.readyState===WebSocket.OPEN&&connected)socket.send(JSON.stringify({type:'block_edit',x,y,z,id:selectedBlock}));
   playSfx(selectedBlock===BLOCK.TORCH?'torch':'place');syncTorchLights();updateInventoryHud();saveWorld();
  }
 }
@@ -268,7 +321,18 @@ function eatFood(){const type=inventory.cookedBeef?'cookedBeef':inventory.cooked
 addEventListener('keydown',e=>{if(document.activeElement?.tagName==='INPUT')return;if(gameStarted&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();setKey(e,true)});
 addEventListener('keyup',e=>setKey(e,false));
 addEventListener('keydown',e=>{if(e.repeat)return;if(e.code==='Space')jumpPlayer();if(e.code==='KeyE'){if(inventoryModal?.classList.contains('hidden'))openInventory();else closeInventory()}if(e.code==='Escape'){if(!inventoryModal?.classList.contains('hidden'))closeInventory();else if(gameStarted)showGameMenu()}if(e.code==='KeyQ')placeSelectedBlock();if(e.code==='KeyR')selectHotbar((selectedHotbar+1)%9);if(e.code==='KeyF')eatFood();if(e.code.startsWith('Digit')&&Number(e.code.slice(-1))>=1&&Number(e.code.slice(-1))<=9)selectHotbar(Number(e.code.slice(-1))-1);});
-$('eatFood')?.addEventListener('click',eatFood);$('openInventory')?.addEventListener('click',openInventory);$('closeInventory')?.addEventListener('click',closeInventory);$('newLocalWorldButton')?.addEventListener('click',()=>beginLocalWorld(true));$('continueWorldButton')?.addEventListener('click',()=>beginLocalWorld(false));$('menuMultiplayerButton')?.addEventListener('click',()=>{gameMenu.classList.add('hidden');loginGate.classList.remove('hidden');loginStatus.textContent='Preparando el acceso multijugador…';void initGoogle();});$('returnMenuButton')?.addEventListener('click',showGameMenu);
+$('eatFood')?.addEventListener('click',eatFood);$('openInventory')?.addEventListener('click',openInventory);$('closeInventory')?.addEventListener('click',closeInventory);
+$('newLocalWorldButton')?.addEventListener('click',()=>{$('worldCreateModal')?.classList.remove('hidden');$('worldNameInput').value='Mi mundo';$('worldSeedInput').value='';});
+$('cancelWorldCreate')?.addEventListener('click',()=>$('worldCreateModal')?.classList.add('hidden'));
+$('randomSeedButton')?.addEventListener('click',()=>$('worldSeedInput').value=String(Math.floor(Math.random()*2147483000)+1));
+$('confirmWorldCreate')?.addEventListener('click',()=>{const name=$('worldNameInput').value.trim()||'Mi mundo';const raw=$('worldSeedInput').value.trim();const seed=raw===''?Math.floor(Math.random()*2147483000)+1:Number(raw);if(!Number.isFinite(seed)){ $('worldSeedInput').focus();return;}const cfg={id:'local-'+Date.now().toString(36)+'-'+Math.floor(Math.random()*9999).toString(36),name,seed,mode:$('worldModeInput').value,difficulty:$('worldDifficultyInput').value};localStorage.setItem('tekaym-last-world',cfg.id);beginLocalWorld(true,cfg);});
+$('continueWorldButton')?.addEventListener('click',()=>{const id=localStorage.getItem('tekaym-last-world');const w=getSavedWorlds().find(v=>v.id===id);if(w)beginLocalWorld(false,w);else renderSavedWorlds();});
+$('openSettingsButton')?.addEventListener('click',()=>$('settingsModal')?.classList.remove('hidden'));
+$('closeSettingsButton')?.addEventListener('click',()=>$('settingsModal')?.classList.add('hidden'));
+$('autosaveIntervalInput')?.addEventListener('change',e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&n>=5&&n<=60)localStorage.setItem('tekaym-autosave-seconds',String(n));});
+$('touchOpacityInput')?.addEventListener('input',e=>document.documentElement.style.setProperty('--touch-opacity',String(Number(e.target.value)/100)));
+$('menuMultiplayerButton')?.addEventListener('click',()=>{$('settingsModal')?.classList.add('hidden');gameMenu.classList.add('hidden');loginGate.classList.remove('hidden');loginStatus.textContent='Preparando el acceso multijugador…';void initGoogle();});
+$('returnMenuButton')?.addEventListener('click',showGameMenu);
 addEventListener('mousedown',e=>{if(!isTouchDevice&&innerWidth>800&&controls.isLocked){if(e.button===0)mineBlock();if(e.button===2)placeSelectedBlock();}});
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 renderer.domElement.addEventListener('pointerdown',()=>{if(!ambientOn)toggleMusic()},{once:true});
@@ -287,7 +351,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){if(gameSta
 renderer.domElement.addEventListener('click',()=>{if(innerWidth>800&&!controls.isLocked)controls.lock()});
 
 function showLogin(text){loginGate.classList.remove('hidden');loginStatus.textContent=text}
-$('loginBackButton')?.addEventListener('click',()=>{loginGate.classList.add('hidden');gameMenu.classList.remove('hidden')});
+$('loginBackButton')?.addEventListener('click',()=>{loginGate.classList.add('hidden');$('settingsModal')?.classList.add('hidden');gameMenu.classList.remove('hidden');renderSavedWorlds()});
 async function createPersonalWorld(){
  if(!serverIsConfigured){$('roomStatus').textContent='El multijugador está pendiente de configurar. Puedes jugar en el mundo local desde el menú principal.';loginStatus.textContent='Falta desplegar el servidor y configurar su URL en src/config.js.';return}
  try{
@@ -372,29 +436,35 @@ function installTouch(){
  const bindHold=(id,key)=>{const el=$(id);if(!el)return;const down=e=>{e.preventDefault();keys[key]=true;try{el.setPointerCapture(e.pointerId)}catch{}};const up=e=>{e.preventDefault();keys[key]=false};el.addEventListener('pointerdown',down);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',up)};
  for(const [id,key] of padKeys)bindHold(id,key);
  const crouch=$('touchCrouch');if(crouch)crouch.addEventListener('click',()=>{keys.crouch=!keys.crouch;crouch.classList.toggle('active',keys.crouch);crouch.textContent=keys.crouch?'●':'○'});
- $('touchJump')?.addEventListener('click',jumpPlayer);$('touchInventory')?.addEventListener('click',openInventory);$('touchFs')?.addEventListener('click',()=>requestLandscape());
- let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0;
- const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);mineTimer=0};
+ $('touchJump')?.addEventListener('pointerdown',e=>{e.preventDefault();jumpPlayer()});
+ let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0,holdMining=false,activeNdc=null;
+ const sphere=$('touchAimSphere');
+ const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);mineTimer=0;holdMining=false};
+ const mineWhileHeld=pointerId=>{if(activePointer!==pointerId||moved||!holdMining)return;mineBlock(activeNdc);mineTimer=setTimeout(()=>mineWhileHeld(pointerId),430)};
  renderer.domElement.addEventListener('pointerdown',e=>{
   if(!isTouchDevice||!gameStarted||!inventoryModal.classList.contains('hidden')||e.pointerType==='mouse')return;
-  activePointer=e.pointerId;startX=lastX=e.clientX;startY=lastY=e.clientY;startedAt=performance.now();moved=false;
+  const rect=renderer.domElement.getBoundingClientRect();
+  activeNdc={x:((e.clientX-rect.left)/rect.width)*2-1,y:-(((e.clientY-rect.top)/rect.height)*2-1)};
+  activePointer=e.pointerId;startX=lastX=e.clientX;startY=lastY=e.clientY;startedAt=performance.now();moved=false;holdMining=true;
+  if(sphere){sphere.style.left=e.clientX+'px';sphere.style.top=e.clientY+'px';sphere.style.display='block';}
   try{renderer.domElement.setPointerCapture(e.pointerId)}catch{}
-  stopMine();mineTimer=setTimeout(()=>{if(activePointer===e.pointerId&&!moved)mineBlock()},650);
+  stopMine();holdMining=true;mineTimer=setTimeout(()=>mineWhileHeld(e.pointerId),520);
  });
  renderer.domElement.addEventListener('pointermove',e=>{
-  if(e.pointerId!==activePointer)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
-  if(Math.hypot(e.clientX-startX,e.clientY-startY)>8){moved=true;stopMine()}
+  if(e.pointerId!==activePointer)return;
+  const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
+  if(Math.hypot(e.clientX-startX,e.clientY-startY)>8){moved=true;stopMine();if(sphere){sphere.style.left=e.clientX+'px';sphere.style.top=e.clientY+'px';}}
   if(moved){lookYaw-=dx*.006;lookPitch=Math.max(-1.15,Math.min(1.15,lookPitch-dy*.0045));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch}
  });
- const finish=e=>{if(e.pointerId!==activePointer)return;const duration=performance.now()-startedAt,wasMoved=moved;stopMine();activePointer=null;try{renderer.domElement.releasePointerCapture(e.pointerId)}catch{}if(!wasMoved&&duration<260){const held=hotbarSlots[selectedHotbar];if(held&&Number(held)>=1&&Number(held)<=14&&(inventory[held]||0)>0)placeSelectedBlock();else attack()}};
+ const finish=e=>{if(e.pointerId!==activePointer)return;const duration=performance.now()-startedAt,wasMoved=moved,ndc=activeNdc;stopMine();activePointer=null;try{renderer.domElement.releasePointerCapture(e.pointerId)}catch{}if(!wasMoved&&duration<260){const held=hotbarSlots[selectedHotbar];if(held&&Number(held)>=1&&Number(held)<=14&&(inventory[held]||0)>0)placeSelectedBlock(ndc);else attack()}setTimeout(()=>{if(sphere)sphere.style.display='none'},450);activeNdc=null};
  renderer.domElement.addEventListener('pointerup',finish);renderer.domElement.addEventListener('pointercancel',e=>{if(e.pointerId===activePointer){stopMine();activePointer=null}});
 }
 installTouch();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,isTouchDevice?1.15:1.6));renderer.shadowMap.enabled=!isTouchDevice});
-async function bootGame(){setBoot('Cargando Tekaym Online…');await loadAssets();boot.classList.add('hidden');showGameMenu();const lastWorld=localStorage.getItem('tekaym-last-world');if($('continueWorldButton'))$('continueWorldButton').disabled=!lastWorld;if($('menuStatus'))$('menuStatus').textContent=lastWorld?'Hay un mundo guardado. Puedes continuar o crear otro.':'Crea tu primer mundo para empezar.'}
+async function bootGame(){setBoot('Cargando Tekaym Online…');await loadAssets();boot.classList.add('hidden');showGameMenu();renderSavedWorlds()}
 bootGame().catch(e=>{console.error('[TEKAYM BOOT]',e);setBoot('No se pudo preparar el juego. Recarga la aplicación.')});
 function isNight(){return worldClock>=650&&worldClock<1150}
  function isDaylight(){return worldClock<650||worldClock>=1150}
- function updateDayCycle(dt){worldClock=(worldClock+dt)%1200;const phase=worldClock/1200*Math.PI*2,elevation=Math.sin(phase),day=THREE.MathUtils.clamp((elevation+.12)/.5,0,1),twilight=THREE.MathUtils.clamp(1-Math.abs(elevation)*4,0,1);const daylight=day*day*(3-2*day);const skyDay=new THREE.Color(0x8bc5e8),skyNight=new THREE.Color(0x071020),skyDawn=new THREE.Color(0xe99560),sky=new THREE.Color().copy(skyNight).lerp(skyDay,daylight).lerp(skyDawn,twilight*.42);scene.background.copy(sky);scene.fog.color.copy(sky);light.intensity=.08+daylight*1.55;light.color.set(isNight()?0x9bb8ed:0xffe2b8);light.position.set(Math.cos(phase)*45,Math.sin(phase)*42,16);hemi.intensity=.25+daylight*1.4;hemi.color.set(isNight()?0x536baf:0xb9e3ff);hemi.groundColor.set(isNight()?0x111a2a:0x4b613c);if(worldClockText){const label=worldClock<600?'DÍA':worldClock<650?'ATARDECER':worldClock<1150?'NOCHE':'AMANECER';const total=Math.floor(worldClock/1200*24*60),hh=String(Math.floor(total/60)).padStart(2,'0'),mm=String(total%60).padStart(2,'0');worldClockText.textContent=label+' · '+hh+':'+mm}const nowNight=isNight(),px=controls.object.position.x,py=controls.object.position.y,pz=controls.object.position.z;sunMesh.position.set(px+Math.cos(phase)*100,py+Math.sin(phase)*82,pz-55);moonMesh.position.set(px-Math.cos(phase)*92,py-Math.sin(phase)*76,pz-48);sunMesh.visible=!nowNight;moonMesh.visible=nowNight||worldClock>=600&&worldClock<650||worldClock>=1150;starField.position.set(px,py,pz);starField.visible=nowNight;if(nowNight&&!nightActive){nightActive=true;let n=0;for(const z of zombies){if(n++>=7)break;z.position.copy(randomZombiePosition());z.userData.hp=45;z.visible=true}}else if(!nowNight&&nightActive){nightActive=false;for(const z of zombies)z.visible=false}for(const z of zombies)if(!nowNight)z.visible=false;updateAnimals(performance.now(),dt);if(performance.now()-lastClockSave>5000){lastClockSave=performance.now();saveWorld();}}
- function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(gameStarted&&!player.dead){if(now-lastAutoSave>10000){saveWorld();lastAutoSave=now}updateDayCycle(dt);moveLocal(dt);updateNeeds(dt);updateFurnace(dt);player.cooldown=Math.max(0,player.cooldown-dt);for(const z of zombies){if(!z.visible)continue;for(const part of z.children){if(part.userData.isZombieArm)part.rotation.x=Math.sin(now*.006+part.userData.side)*.16}if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
+ function updateDayCycle(dt){worldClock=(worldClock+dt)%1200;const phase=worldClock/1200*Math.PI*2,elevation=Math.sin(phase),day=THREE.MathUtils.clamp((elevation+.12)/.5,0,1),twilight=THREE.MathUtils.clamp(1-Math.abs(elevation)*4,0,1);const daylight=day*day*(3-2*day);const skyDay=new THREE.Color(0x8bc5e8),skyNight=new THREE.Color(0x071020),skyDawn=new THREE.Color(0xe99560),sky=new THREE.Color().copy(skyNight).lerp(skyDay,daylight).lerp(skyDawn,twilight*.42);scene.background.copy(sky);scene.fog.color.copy(sky);light.intensity=.08+daylight*1.55;light.color.set(isNight()?0x9bb8ed:0xffe2b8);light.position.set(Math.cos(phase)*45,Math.sin(phase)*42,16);hemi.intensity=.25+daylight*1.4;hemi.color.set(isNight()?0x536baf:0xb9e3ff);hemi.groundColor.set(isNight()?0x111a2a:0x4b613c);if(worldClockText){const label=worldClock<600?'DÍA':worldClock<650?'ATARDECER':worldClock<1150?'NOCHE':'AMANECER';const total=Math.floor(worldClock/1200*24*60),hh=String(Math.floor(total/60)).padStart(2,'0'),mm=String(total%60).padStart(2,'0');worldClockText.textContent=label+' · '+hh+':'+mm}const nowNight=isNight(),px=controls.object.position.x,py=controls.object.position.y,pz=controls.object.position.z;sunMesh.position.set(px+Math.cos(phase)*100,py+Math.sin(phase)*82,pz-55);moonMesh.position.set(px-Math.cos(phase)*92,py-Math.sin(phase)*76,pz-48);sunMesh.visible=!nowNight;moonMesh.visible=nowNight||worldClock>=600&&worldClock<650||worldClock>=1150;starField.position.set(px,py,pz);starField.visible=nowNight;if(nowNight&&!nightActive){nightActive=true;if(currentWorldMeta.mode!=='creative'&&currentWorldMeta.difficulty!=='peaceful'){let n=0;for(const z of zombies){if(n++>=7)break;z.position.copy(randomZombiePosition());z.userData.hp=45;z.visible=true}}}else if(!nowNight&&nightActive){nightActive=false;for(const z of zombies)z.visible=false}for(const z of zombies)if(!nowNight||currentWorldMeta.mode==='creative'||currentWorldMeta.difficulty==='peaceful')z.visible=false;updateAnimals(performance.now(),dt);}
+ function animate(now){const dt=Math.min(.05,(now-last)/1000);last=now;if(gameStarted&&!player.dead){if(now-lastAutoSave>(Math.max(5,Math.min(60,Number(localStorage.getItem('tekaym-autosave-seconds'))||10))*1000)){saveWorld();lastAutoSave=now}updateDayCycle(dt);moveLocal(dt);updateNeeds(dt);updateFurnace(dt);player.cooldown=Math.max(0,player.cooldown-dt);for(const z of zombies){if(!z.visible)continue;for(const part of z.children){if(part.userData.isZombieArm)part.rotation.x=Math.sin(now*.006+part.userData.side)*.16}if(connected&&Number.isFinite(z.userData.targetX)&&Number.isFinite(z.userData.targetZ)){const tx=z.userData.targetX,tz=z.userData.targetZ;z.position.x+=(tx-z.position.x)*(1-Math.exp(-10*dt));z.position.z+=(tz-z.position.z)*(1-Math.exp(-10*dt));}else if(!connected){const to=controls.object.position.clone().sub(z.position);to.y=0;const d=to.length();if(d<14&&d>1.3){to.normalize();z.position.addScaledVector(to,z.userData.speed*dt);z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;z.rotation.y=Math.atan2(to.x,to.z)}}z.position.y=voxelWorld.getHeightAt(z.position.x,z.position.z)-1.65;}sendMove(now);updateHud()}renderer.render(scene,camera);requestAnimationFrame(animate)}
 updateHud();renderHotbar();requestAnimationFrame(animate);
