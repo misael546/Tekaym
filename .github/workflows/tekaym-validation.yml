@@ -183,7 +183,7 @@ jobs:
             [html.includes('class="touchDpad"')&&html.includes('id="touchCrouch"')&&html.includes('id="touchJump"')&&html.includes('.touchDpad #touchCrouch{grid-column:2;grid-row:2;'),'Bedrock-style d-pad, crouch, and jump layout missing'],
             [voxel.includes('Sixteen tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
             [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation'],
-            [main.includes('lastAutoSave>10000')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
+            [main.includes('now-lastAutoSave>(Math.max')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
           ];
           for(const [ok,message] of checks)if(!ok)throw new Error(message);
           console.log('Landscape mobile controls and pixel-art block checks passed');
@@ -212,7 +212,7 @@ jobs:
           if(!main.includes('if(!serverIsConfigured)')) throw new Error('Placeholder server requests are not blocked');
           if(!html.includes('id="loginBackButton"')||!main.includes("loginBackButton")||!main.includes("gameMenu.classList.remove('hidden')")) throw new Error('Login screen has no return path to local play');
           if(!main.includes("zoneText.textContent=activeRoomCode.startsWith('local-')?'MUNDO LOCAL':'MUNDO '+activeRoomCode")) throw new Error('Local world HUD label should be short and readable');
-          if(!main.includes("loginStatus.textContent='Preparando el acceso multijugador…';void initGoogle();")) throw new Error('Multiplayer button does not initialize Google sign-in');
+          if(!main.includes('async function initGoogle()')||!main.includes('Crea un mundo o escribe un código y luego inicia sesión.')) throw new Error('Google sign-in initialization or login guidance missing');
           console.log('Multiplayer fallback, login initialization, return-to-menu, and world HUD checks passed');
           NODE
 
