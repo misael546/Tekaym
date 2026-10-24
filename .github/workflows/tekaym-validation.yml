@@ -57,7 +57,7 @@ jobs:
           const worker=fs.readFileSync('worker/src/index.js','utf8');
           const checks=[
             [((main.includes("createVoxelWorld(scene)")||main.includes("createVoxelWorld(scene,worldSeed)"))||main.includes("createVoxelWorld(scene,worldSeed)")),'Voxel world is not integrated into the client'],
-            [main.includes('function updateMining(dt)')&&main.includes('voxelWorld.breakBlock(camera,miningNdc)'),'Progressive mining action missing'],
+            [main.includes('function updateMining(dt)')&&main.includes('voxelWorld.breakBlockAt(target.x,target.y,target.z,target.id)')&&voxel.includes('function breakBlockAt(x, y, z, expectedId = null)'),'Progressive mining action missing'],
             [main.includes("voxelWorld.placeBlock(camera"),'Block placement missing'],
             [main.includes("voxelWorld.resetChanges("),'Room-switch reset missing'],
             [main.includes("navigator.clipboard.writeText(activeRoomCode)"),'Invite-code copy action missing'],
