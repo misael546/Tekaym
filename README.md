@@ -21,6 +21,7 @@ Juego de supervivencia 3D en primera persona con mundo cúbico procedural, const
 - Los zombis se activan por la noche y se acercan a los jugadores; durante el día dejan de perseguir y atacar.
 - Colisión básica con bloques y ajuste de altura al terreno.
 - Guardado local del mundo modificado e inventario en el navegador/dispositivo.
+- Multijugador directo WebRTC: un jugador aloja su mundo local y comparte terreno modificado y posiciones de jugadores sin alojar el mundo en un servidor central. La invitación y respuesta se intercambian manualmente como texto.
 - Se conservan los sistemas existentes de vida, resistencia, hambre, sed y zombis.
 
 ## Controles
@@ -42,20 +43,21 @@ Juego de supervivencia 3D en primera persona con mundo cúbico procedural, const
 ## Desarrollo pendiente
 
 - Pruebas y endurecimiento de la sincronización de bloques por mundo.
-- Probar la creación de mundos con códigos de invitación y el cierre cuando el anfitrión se desconecta.
-- Verificar el guardado remoto del mundo y el acceso de amigos.
+- Probar el intercambio de invitación/respuesta WebRTC entre dos dispositivos y el cierre cuando el anfitrión se desconecta.
+- Sincronizar y verificar todas las entidades, inventarios y acciones de supervivencia en una sesión P2P.
 - Verificación visual de carga y descarga de chunks en navegador y móvil.
 - Mejoras de IA, animaciones, herramientas y recetas.
 - Empaquetado y pruebas de una APK Android.
 
-El proyecto contiene rutas para crear salas, entrar con código y sincronizar cambios de bloques mediante Durable Objects. Sin embargo, la URL del Worker sigue pendiente de configurar en `src/config.js`, por lo que el multijugador no se puede probar desde el cliente publicado todavía. El guardado local funciona como respaldo; la sincronización remota requiere despliegue y pruebas.
+El modo P2P usa WebRTC DataChannel: el anfitrión mantiene el mundo y los cambios se transmiten directamente cuando la conexión logra establecerse. Para evitar un servicio de señalización central, la invitación (oferta) y la respuesta se copian y se comparten manualmente por un chat privado. Se necesita un navegador con HTTPS y redes que permitan establecer la conexión; algunas redes requieren TURN y pueden impedir la conexión directa. La conexión debe probarse con dos dispositivos reales. El antiguo sistema de salas con Worker permanece en el código como vía separada, pero no es necesario para el modo P2P.
 
-## Arquitectura existente
+## Arquitectura
 
 - Cliente Three.js.
-- Cloudflare Workers + Durable Objects para el backend previsto.
-- Firebase/Firestore para cuentas y progreso previsto.
+- WebRTC DataChannel para compartir directamente el mundo alojado en el dispositivo del anfitrión.
+- STUN para ayudar a descubrir rutas de conexión; la señalización se hace intercambiando manualmente oferta/respuesta.
 - GitHub Pages para el cliente web.
+- El Worker y Firebase no son necesarios para alojar mundos en el modo P2P.
 
 No guardar secretos en GitHub. No copiar archivos, bases de datos ni sistemas de DarkPixel o NeonCore a este repositorio.
 
