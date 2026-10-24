@@ -45,7 +45,7 @@ const keys={w:false,a:false,s:false,d:false};
 let streamedChunkX=Infinity,streamedChunkZ=Infinity;
 const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false,grounded:true,jumpVelocity:0};
 let knife=null,handModel=null,heldVisual=null,socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,googleReady=false,connected=false;
-let p2pConnection=null,p2pRole=null,p2pRemoteId='p2p-guest';
+let p2pConnection=null,p2pRole=null,p2pRemoteId='p2p-guest',pendingP2PWorld=null;
 function disconnectMultiplayer(){
  if(p2pConnection){try{p2pConnection.close()}catch{}}
  p2pConnection=null;p2pRole=null;
@@ -357,7 +357,7 @@ function buildDirectP2PModal(){
    if(p2pConnection){p2pConnection.close();p2pConnection=null}
    p2pRole='host';p2pRemoteId='p2p-guest';player.id='p2p-host';connected=false;
    $('p2pStatus').textContent='Preparando conexión directa…';
-   p2pConnection=createDirectHost({onMessage:handleP2PMessage,onOpen:()=>{connected=true;$('p2pStatus').textContent='Conectado directamente. Tu mundo sigue guardándose en este dispositivo.';sendP2P({type:'world_init',seed:worldSeed,blocks:voxelWorld.serializeChanges(),meta:currentWorldMeta,worldClock,inventory:{...inventory},hotbarSlots:[...hotbarSlots],selectedBlock,playerPosition:{x:controls.object.position.x,y:controls.object.position.y,z:controls.object.position.z}})},onClose:()=>{connected=false;$('p2pStatus').textContent='La conexión con tu amigo se cerró.'}});
+   p2pConnection=createDirectHost({onMessage:handleP2PMessage,onOpen:()=>{connected=true;$('p2pStatus').textContent='Conectado directamente. Tu mundo sigue guardándose en este dispositivo.';sendP2PWorldSnapshot()},onClose:()=>{connected=false;$('p2pStatus').textContent='La conexión con tu amigo se cerró.'}});
    $('p2pOfferOut').value=await p2pConnection.ready;
    $('p2pStatus').textContent='Invitación lista. Envíala a tu amigo. Después pega aquí la respuesta que él genere.';
   }catch(e){$('p2pStatus').textContent=e.message||'No se pudo crear la invitación.'}
@@ -381,34 +381,37 @@ function buildDirectP2PModal(){
 async function copyP2PText(id){const value=$(id)?.value||'';if(!value){$('p2pStatus').textContent='Todavía no hay ningún código para copiar.';return}try{await navigator.clipboard.writeText(value);$('p2pStatus').textContent='Código copiado. Envíalo a tu amigo por un chat privado.'}catch{$(id).focus();$(id).select();$('p2pStatus').textContent='No se pudo copiar automáticamente; mantén pulsado el texto y selecciona Copiar.'}}
 function openDirectP2P(){buildDirectP2PModal();$('directP2PModal').classList.remove('hidden');}
 function sendP2P(message){if(p2pConnection&&connected){try{return p2pConnection.send(message)}catch(e){console.warn('[TEKAYM P2P] No se pudo enviar',e)}}return false}
+function sendP2PWorldSnapshot(){const blocks=voxelWorld.serializeChanges();sendP2P({type:'world_init_start',seed:worldSeed,meta:currentWorldMeta,worldClock,inventory:{...inventory},hotbarSlots:[...hotbarSlots],selectedBlock,playerPosition:{x:controls.object.position.x,y:controls.object.position.y,z:controls.object.position.z},blockCount:blocks.length});for(let i=0;i<blocks.length;i+=250)sendP2P({type:'world_init_blocks',blocks:blocks.slice(i,i+250)});sendP2P({type:'world_init_end'});}
 function sendBlockEdit(edit){
  if(!p2pConnection||!connected){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'block_edit',...edit}));return}
  if(p2pRole==='guest')sendP2P({type:'block_request',...edit});
  else {sendP2P({type:'block_edit',...edit});}
 }
 function handleP2PMessage(message){
- if(message.type==='world_init'&&p2pRole==='guest'){
-  if(Number.isFinite(Number(message.seed))){worldSeed=Number(message.seed);voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);voxelWorld.applyChanges(Array.isArray(message.blocks)?message.blocks:[]);}
-  currentWorldMeta={...(message.meta||{}),id:'p2p-guest-'+String(message.meta?.id||'world'),name:(message.meta?.name||'Mundo de amigo')+' (invitado)',seed:worldSeed};
+ if(message.type==='world_init_start'&&p2pRole==='guest'){pendingP2PWorld={...message,blocks:[]};return}
+ if(message.type==='world_init_blocks'&&p2pRole==='guest'&&pendingP2PWorld){if(Array.isArray(message.blocks))pendingP2PWorld.blocks.push(...message.blocks);return}
+ if(message.type==='world_init_end'&&p2pRole==='guest'&&pendingP2PWorld){
+  const snapshot=pendingP2PWorld;pendingP2PWorld=null;
+  if(Number.isFinite(Number(snapshot.seed))){worldSeed=Number(snapshot.seed);voxelWorld.dispose();voxelWorld=createVoxelWorld(scene,worldSeed);voxelWorld.applyChanges(snapshot.blocks);}
+  currentWorldMeta={...(snapshot.meta||{}),id:'p2p-guest-'+String(snapshot.meta?.id||'world'),name:(snapshot.meta?.name||'Mundo de amigo')+' (invitado)',seed:worldSeed};
   activeRoomCode=currentWorldMeta.id;
-  for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(message.inventory?.[k])||0));
-  if(Array.isArray(message.hotbarSlots))hotbarSlots=message.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);
-  selectedBlock=Number(message.selectedBlock)||BLOCK.DIRT;worldClock=Number(message.worldClock)||0;
-  if(message.playerPosition){const p=message.playerPosition;controls.object.position.set(Number(p.x)||0,Number(p.y)||voxelWorld.getHeightAt(Number(p.x)||0,Number(p.z)||0),Number(p.z)||0)}
+  for(const k of Object.keys(inventory))inventory[k]=Math.max(0,Math.min(9999,Number(snapshot.inventory?.[k])||0));
+  if(Array.isArray(snapshot.hotbarSlots))hotbarSlots=snapshot.hotbarSlots.slice(0,9).concat(Array(9).fill(null)).slice(0,9);
+  selectedBlock=Number(snapshot.selectedBlock)||BLOCK.DIRT;worldClock=Number(snapshot.worldClock)||0;
+  if(snapshot.playerPosition){const p=snapshot.playerPosition;controls.object.position.set(Number(p.x)||0,Number(p.y)||voxelWorld.getHeightAt(Number(p.x)||0,Number(p.z)||0),Number(p.z)||0)}
   gameStarted=true;gameMenu.classList.add('hidden');loginGate.classList.add('hidden');boot.classList.add('hidden');$('hud').style.display='block';$('touch').style.display='';
-  voxelWorld.updateStreaming(controls.object.position);streamedChunkX=Math.floor(controls.object.position.x/16);streamedChunkZ=Math.floor(controls.object.position.z/16);syncTorchLights();renderHotbar();updateInventoryHud();saveWorld();zoneText.textContent='INVITADO · '+(message.meta?.name||'MUNDO');
-  $('p2pStatus').textContent='Mundo recibido. Los cambios que hagas se enviarán al anfitrión.';sendP2P({type:'guest_ready'});return;
+  voxelWorld.updateStreaming(controls.object.position);streamedChunkX=Math.floor(controls.object.position.x/16);streamedChunkZ=Math.floor(controls.object.position.z/16);syncTorchLights();renderHotbar();updateInventoryHud();saveWorld();zoneText.textContent='INVITADO · '+(snapshot.meta?.name||'MUNDO');
+  $('p2pStatus').textContent='Mundo recibido. Los cambios de bloques se transmitirán al anfitrión.';return;
  }
- if(message.type==='guest_ready'&&p2pRole==='host'){sendP2P({type:'world_init',seed:worldSeed,blocks:voxelWorld.serializeChanges(),meta:currentWorldMeta,worldClock,inventory:{...inventory},hotbarSlots:[...hotbarSlots],selectedBlock,playerPosition:{x:controls.object.position.x,y:controls.object.position.y,z:controls.object.position.z}});return}
  if(message.type==='block_request'&&p2pRole==='host'){
   const edit={x:Number(message.x),y:Number(message.y),z:Number(message.z),id:Number(message.id)};
   if([edit.x,edit.y,edit.z,edit.id].every(Number.isFinite)){voxelWorld.applyChanges([edit]);syncTorchLights();saveWorld();sendP2P({type:'block_edit',...edit})}return;
  }
  if(message.type==='block_edit'){const edit={x:Number(message.x),y:Number(message.y),z:Number(message.z),id:Number(message.id)};if([edit.x,edit.y,edit.z,edit.id].every(Number.isFinite)){voxelWorld.applyChanges([edit]);syncTorchLights();saveWorld()}return}
  if(message.type==='player_state'){
+  if(p2pRole==='guest'&&Number.isFinite(Number(message.worldClock)))worldClock=((Number(message.worldClock)%1200)+1200)%1200;
   const id=message.id||(p2pRole==='host'?'p2p-guest':'p2p-host');applyState({players:[{id,x:Number(message.x)||0,z:Number(message.z)||0,hp:100,hunger:100,thirst:100}]});return;
  }
- if(message.type==='guest_ready')return;
 }
 
 const friendsButton=document.createElement('button');friendsButton.type='button';friendsButton.className='worldbtn';friendsButton.id='directP2PButton';friendsButton.textContent='AMIGOS';friendsButton.addEventListener('click',openDirectP2P);$('hud')?.querySelector('.worldbar')?.append(friendsButton);
@@ -509,7 +512,7 @@ function sendMove(now){
  const x=controls.object.position.x,z=controls.object.position.z;
  if(Math.hypot(x-lastSentX,z-lastSentZ)<.08)return;
  lastNet=now;lastSentX=x;lastSentZ=z;
- if(p2pConnection){sendP2P({type:'player_state',id:p2pRole==='host'?'p2p-host':'p2p-guest',x,z,hp:player.hp,hunger:player.hunger,thirst:player.thirst});return}
+ if(p2pConnection){sendP2P({type:'player_state',id:p2pRole==='host'?'p2p-host':'p2p-guest',x,z,hp:player.hp,hunger:player.hunger,thirst:player.thirst,worldClock});return}
  if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:'move',x,z}));
 }
 function installTouch(){
