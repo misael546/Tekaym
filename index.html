@@ -34,11 +34,8 @@
 .worldbar{position:fixed;right:12px;top:58px;display:grid;gap:6px;max-width:min(210px,48vw);max-height:135px;overflow:auto;padding:8px;border:1px solid #314052;border-radius:12px;background:#03070bdc;z-index:24;pointer-events:auto}
 .worldbar .invline{font-size:10px;color:#d7e2ef;line-height:1.45}.worldbar .worldbtn{padding:8px 10px;border:1px solid #465b70;border-radius:8px;background:#142334;color:#f2f6fa;font-size:11px;font-weight:800}
 .worldbar .selected{color:#d7e6a0;cursor:pointer}
-.touchWorldActions{position:absolute;right:16px;top:212px;display:grid;gap:7px;pointer-events:auto}
-.touchWorldActions button{min-width:72px;padding:10px 8px;border:1px solid #63778e;border-radius:10px;background:#142334ee;color:#fff;font-size:10px;font-weight:900}
-@media(max-width:800px){#touch{display:block}.worldbar{top:5px;right:5px;max-width:110px;padding:3px}.worldbar .worldbtn{padding:5px;font-size:10px}.top{top:5px;left:5px;width:min(190px,38vw)}.meter{padding:4px 6px}.needs,.bottom{display:none}}
-.bottom{bottom:145px}.version{top:7px}.cross{font-size:16px}.worldbar{top:58px;right:8px;max-width:42vw;padding:6px}.worldbar .worldbtn{padding:7px;font-size:10px}.worldbar .invline{font-size:9px}.touchWorldActions{top:210px;right:10px}}
-@media(pointer:coarse){#touch{display:block!important}.touchDpad{width:clamp(112px,28vh,138px);height:clamp(112px,28vh,138px)}.touchJump{width:56px;height:56px}#hotbar{bottom:5px;gap:2px;padding:3px}.hotbarSlot{width:clamp(26px,5vw,42px);height:35px}.worldbar{top:5px;right:5px;max-width:105px;max-height:70px;padding:2px}.worldbar .worldbtn{font-size:9px;padding:5px}.worldbar #audioToggle{display:none!important}.zone,.needs,.bottom{display:none!important}}
+@media(max-width:800px){#touch{display:block}.worldbar{top:5px;right:5px;max-width:110px;padding:3px}.worldbar .worldbtn{padding:5px;font-size:10px}.top{top:5px;left:5px;width:min(190px,38vw)}.meter{padding:4px 6px}.top>.meter:nth-child(2){display:none}.needs{display:grid;grid-template-columns:1fr}.needs .meter:nth-child(2){display:none}.bottom{display:none}}
+@media(pointer:coarse){#touch{display:block!important}.touchDpad{width:clamp(112px,28vh,138px);height:clamp(112px,28vh,138px)}.touchJump{width:56px;height:56px}#hotbar{bottom:5px;gap:2px;padding:3px}.hotbarSlot{width:clamp(26px,5vw,42px);height:35px}.worldbar{top:5px;right:5px;max-width:105px;max-height:70px;padding:2px}.worldbar .worldbtn{font-size:9px;padding:5px}.worldbar #audioToggle{display:none!important}.zone,.bottom{display:none!important}.top>.meter:nth-child(2){display:none}.needs{display:grid;grid-template-columns:1fr}.needs .meter:nth-child(2){display:none}}
 </style>
 </head>
 <body>
