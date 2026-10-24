@@ -174,12 +174,39 @@ function canOccupy(x,z,eyeY){
  return true;
 }
 function moveLocal(dt){
- const sprinting=keys.shift&&player.stamina>1;const speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2)),v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
- if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);const next=controls.object.position.clone().addScaledVector(dir,speed*dt);const limit=99900;if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){if(player.grounded)next.y=voxelWorld.getHeightAt(next.x,next.z);if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)}else player.stamina=Math.min(100,player.stamina+22*dt);
+ const sprinting=keys.shift&&player.stamina>1;
+ const speed=keys.crouch?1.45:(player.stamina<1?2.1:(sprinting?7.2:4.2));
+ const v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
+ if(v.lengthSq()){
+  v.normalize();
+  const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y;
+  const dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+  const pos=controls.object.position;
+  const next=pos.clone().addScaledVector(dir,speed*dt);
+  const limit=99900;
+  if(Math.abs(next.x)<limit&&Math.abs(next.z)<limit){
+   if(player.grounded){
+    const currentGround=voxelWorld.getHeightAt(pos.x,pos.z);
+    const targetGround=voxelWorld.getHeightAt(next.x,next.z);
+    next.y=currentGround;
+    // Minecraft-style auto-step: allow climbing a single block, but not walls.
+    if(targetGround>currentGround+.08&&targetGround-currentGround<=1.05){
+     const stepped=next.clone();stepped.y=targetGround;
+     if(canOccupy(stepped.x,stepped.z,stepped.y))controls.object.position.copy(stepped);
+    }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
+   }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
+  }
+  player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt);
+ }else player.stamina=Math.min(100,player.stamina+22*dt);
  const pos=controls.object.position,groundY=voxelWorld.getHeightAt(pos.x,pos.z);
  if(player.grounded){pos.y=groundY;player.jumpVelocity=0}
- else{const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
- const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
+ else{
+  const oldY=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;
+  if(pos.y<=groundY){pos.y=groundY;player.jumpVelocity=0;player.grounded=true}
+  else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=oldY;player.jumpVelocity=Math.min(0,player.jumpVelocity)}
+ }
+ const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);
+ if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
 }
 function updateNeeds(dt){
  player.hunger=Math.max(0,player.hunger-.18*dt);player.thirst=Math.max(0,player.thirst-.26*dt);
@@ -373,16 +400,18 @@ function installTouch(){
  for(const [id,key] of padKeys)bindHold(id,key);
  const crouch=$('touchCrouch');if(crouch)crouch.addEventListener('click',()=>{keys.crouch=!keys.crouch;crouch.classList.toggle('active',keys.crouch);crouch.textContent=keys.crouch?'●':'○'});
  $('touchJump')?.addEventListener('click',jumpPlayer);$('touchInventory')?.addEventListener('click',openInventory);$('touchFs')?.addEventListener('click',()=>requestLandscape());
- let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0;
- const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);mineTimer=0};
+ let activePointer=null,startX=0,startY=0,lastX=0,lastY=0,startedAt=0,moved=false,mineTimer=0,holdMining=false;
+ const stopMine=()=>{if(mineTimer)clearTimeout(mineTimer);mineTimer=0;holdMining=false};
+ const mineWhileHeld=pointerId=>{if(activePointer!==pointerId||moved||!holdMining)return;mineBlock();mineTimer=setTimeout(()=>mineWhileHeld(pointerId),430)};
  renderer.domElement.addEventListener('pointerdown',e=>{
   if(!isTouchDevice||!gameStarted||!inventoryModal.classList.contains('hidden')||e.pointerType==='mouse')return;
-  activePointer=e.pointerId;startX=lastX=e.clientX;startY=lastY=e.clientY;startedAt=performance.now();moved=false;
+  activePointer=e.pointerId;startX=lastX=e.clientX;startY=lastY=e.clientY;startedAt=performance.now();moved=false;holdMining=true;
   try{renderer.domElement.setPointerCapture(e.pointerId)}catch{}
-  stopMine();mineTimer=setTimeout(()=>{if(activePointer===e.pointerId&&!moved)mineBlock()},650);
+  stopMine();holdMining=true;mineTimer=setTimeout(()=>mineWhileHeld(e.pointerId),520);
  });
  renderer.domElement.addEventListener('pointermove',e=>{
-  if(e.pointerId!==activePointer)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
+  if(e.pointerId!==activePointer)return;
+  const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;
   if(Math.hypot(e.clientX-startX,e.clientY-startY)>8){moved=true;stopMine()}
   if(moved){lookYaw-=dx*.006;lookPitch=Math.max(-1.15,Math.min(1.15,lookPitch-dy*.0045));camera.rotation.order='YXZ';camera.rotation.y=lookYaw;camera.rotation.x=lookPitch}
  });
