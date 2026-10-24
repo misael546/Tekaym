@@ -161,6 +161,8 @@ jobs:
           if(!m.includes('RECIPES.filter(r=>canCraftRecipe(r)&&(!TABLE_RECIPES.has(r.name)||openedCraftingStation))'))throw new Error('Material-filtered and crafting-table-gated recipes missing');
           if(!m.includes('function renderHotbar()')||!h.includes('id="hotbar"'))throw new Error('Hotbar missing');
            if(!m.includes('.slice(0,32)')||!h.includes('repeat(8,minmax(0,1fr))'))throw new Error('32-slot inventory grid missing');
+           if(!m.includes('function addToHotbar(key)')||!m.includes('function deleteSavedWorld(world)')||!m.includes("remove.textContent='BORRAR'")||!m.includes('>12){moved=true;stopMine()'))throw new Error('Auto-slot assignment, touch threshold, or world deletion fix missing');
+           if(!m.includes('for(const r of RECIPES)')||!h.includes('grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr)'))throw new Error('Always-visible side-by-side crafting recipes missing');
            if(!m.includes('inventory[String(k)]||0)<=0'))throw new Error('Empty hotbar stacks must clear');
           if(!m.includes('MANOS VACÍAS'))throw new Error('Empty-hand start is missing');
           if(!m.includes("e.code.startsWith('Digit')")||!m.includes("e.code==='KeyE'"))throw new Error('Inventory/hotbar keyboard controls missing');
