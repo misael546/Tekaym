@@ -113,7 +113,7 @@ function updateHeldItem(){
 function swingHeldItem(){heldSwing=1}
 function spawnDroppedItem(key,amount,x,y,z,color=null){
  const k=String(key),isBlock=Number.isInteger(Number(k))&&Number(k)>=1&&Number(k)<=14,material=new THREE.MeshStandardMaterial({color:color??({1:0x597342,2:0x6c4934,3:0x77766f,4:0xbda978,5:0x64452b,6:0x365b32,7:0x353633,8:0x8d7768,9:0xbca45b,10:0x5caeaa,11:0x98734b,12:0x785032,13:0x4b4b48,14:0xd7a05b}[k]||0x9a8a70),roughness:.92});
- const mesh=new THREE.Mesh(new THREE.BoxGeometry(isBlock?.38:.24,isBlock?.38:.24,isBlock?.38:.24),material);mesh.position.set(x+.5,y+.55,z+.5);mesh.rotation.set(Math.random(),Math.random(),Math.random());mesh.userData={key:k,amount:Math.max(1,amount|0),velocity:new THREE.Vector3((Math.random()-.5)*1.8,2+Math.random()*1.2,(Math.random()-.5)*1.8),life:120,bob:Math.random()*6.28};scene.add(mesh);droppedItems.push(mesh);return mesh;
+ const meat=/rawBeef|rawPork|rawChicken|cookedBeef|cookedPork|cookedChicken/.test(k),geo=isBlock?new THREE.BoxGeometry(.38,.38,.38):k==='feathers'?new THREE.BoxGeometry(.09,.32,.045):k==='leather'?new THREE.BoxGeometry(.28,.055,.24):k==='arrows'?new THREE.BoxGeometry(.34,.045,.045):meat?new THREE.BoxGeometry(.29,.16,.24):new THREE.BoxGeometry(.24,.24,.24);const mesh=new THREE.Mesh(geo,material);mesh.position.set(x+.5,y+.55,z+.5);mesh.rotation.set(Math.random(),Math.random(),Math.random());mesh.userData={key:k,amount:Math.max(1,amount|0),velocity:new THREE.Vector3((Math.random()-.5)*1.8,2+Math.random()*1.2,(Math.random()-.5)*1.8),life:120,bob:Math.random()*6.28};scene.add(mesh);droppedItems.push(mesh);return mesh;
 }
 function updateDroppedItems(dt,now){for(let i=droppedItems.length-1;i>=0;i--){const d=droppedItems[i];d.userData.life-=dt;d.userData.velocity.y-=9.8*dt;d.position.addScaledVector(d.userData.velocity,dt);const floor=voxelWorld.getHeightAt(d.position.x,d.position.z)-1.25;if(d.position.y<floor){d.position.y=floor;d.userData.velocity.y=Math.abs(d.userData.velocity.y)*.22;if(Math.abs(d.userData.velocity.y)<.55)d.userData.velocity.y=0;d.userData.velocity.x*=.72;d.userData.velocity.z*=.72}d.rotation.y+=dt*1.5;d.position.y+=Math.sin(now*.004+d.userData.bob)*.0009;if(gameStarted&&d.position.distanceTo(controls.object.position)<1.45){const k=d.userData.key,amt=d.userData.amount;inventory[k]=(inventory[k]||0)+amt;addToHotbar(k);showToast('Recogiste '+itemLabel(k)+(amt>1?' ×'+amt:''));scene.remove(d);d.geometry.dispose();d.material.dispose();droppedItems.splice(i,1);updateInventoryHud();saveWorld();continue}if(d.userData.life<=0){scene.remove(d);d.geometry.dispose();d.material.dispose();droppedItems.splice(i,1)}}}
 function spawnBlockParticles(x,y,z,color){
@@ -160,9 +160,23 @@ function randomNearPlayer(min=10,max=28){
 function randomZombiePosition(){let p;for(let i=0;i<24;i++){p=randomNearPlayer(24,32);if(!isTorchProtected(Math.floor(p.x),Math.floor(p.z)))break}p.y=voxelWorld.getHeightAt(p.x,p.z)-1.65;return p}
 function makePixelNoiseTexture(seed=1){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=16;
- const ctx=canvas.getContext('2d');const palette=['#ffffff','#e5e5e5','#c8c8c8','#f5f5f5','#b8b8b8'];
+ const ctx=canvas.getContext('2d');
+ const palettes={
+  17:['#477a52','#386346','#5d8f5b','#6b9b63'],
+  29:['#6f9a55','#5e8248','#8eb86c','#a1c87c'],
+  43:['#303e8b','#242f6f','#3c4caa','#5061ba'],
+  53:['#ffffff','#eee5d7','#f8f2e8','#d9d0c1'],
+  67:['#eaa0a0','#d98b8e','#f6b2b2','#f8c2b8'],
+  79:['#f3f0e5','#fff8e9','#ece4d4','#d5c9b5']
+ };
+ const palette=palettes[seed]||['#77766f','#66655f','#8b8980','#a19e93','#565650'];
  let n=seed>>>0;const random=()=>{n=(n*1664525+1013904223)>>>0;return n/4294967296};
- for(let y=0;y<16;y++)for(let x=0;x<16;x++){ctx.fillStyle=palette[Math.floor(random()*palette.length)];ctx.fillRect(x,y,1,1)}
+ for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+  const cluster=(Math.floor(x/2)+Math.floor(y/2)*3+Math.floor(random()*3))%palette.length;
+  ctx.fillStyle=palette[cluster];ctx.fillRect(x,y,1,1);
+ }
+ // Tiny, deterministic patches make the 16px surfaces read as fabric, fur, or worn armor rather than white noise.
+ for(let i=0;i<9;i++){const x=Math.floor(random()*14),y=Math.floor(random()*14);ctx.fillStyle=palette[Math.floor(random()*palette.length)];ctx.fillRect(x,y,2,2)}
  const texture=new THREE.CanvasTexture(canvas);texture.magFilter=THREE.NearestFilter;texture.minFilter=THREE.NearestFilter;texture.generateMipmaps=false;texture.colorSpace=THREE.SRGBColorSpace;return texture;
 }
 function spawnProceduralZombies(count){

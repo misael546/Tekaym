@@ -205,7 +205,14 @@ export function createVoxelWorld(scene, seedValue=7919) {
             // Sixteen tiny color tiles per face create a sharper original pixel-art texture without external copyrighted assets.
             for (let py = 0; py < 4; py++) for (let px = 0; px < 4; px++) {
               const u0=px/4,u1=(px+1)/4,v0=py/4,v1=(py+1)/4;
-              const tileVariation=0.86+hash(x*13+px*29+face*17,y*11+py*31+id*7,z*17+seed)*0.28;
+              const noise=0.84+hash(x*13+px*29+face*17,y*11+py*31+id*7,z*17+seed)*0.24;
+              let tileVariation=noise;
+              if(id===BLOCK.WOOD||id===BLOCK.PLANKS||id===BLOCK.CRAFTING_TABLE)tileVariation*=((py%2===0)?0.88:1.08)*((px===0||px===3)?0.92:1);
+              else if(id===BLOCK.STONE||id===BLOCK.FURNACE||id===BLOCK.COAL_ORE)tileVariation*=((px+py*3)%5===0)?0.68:1;
+              else if(id===BLOCK.GRASS)tileVariation*=py===0?1.14:py===3?0.82:1;
+              else if(id===BLOCK.DIRT)tileVariation*=((px*7+py*3)%6===0)?0.74:1;
+              else if(id===BLOCK.LEAVES)tileVariation*=((px+py)%3===0)?1.16:0.91;
+              else if(id===BLOCK.SAND)tileVariation*=((px+py*2)%5===0)?0.9:1.03;
               const c=base.clone().multiplyScalar(shade*tileVariation);
               for (const p of [sample(u0,v0),sample(u1,v0),sample(u1,v1),sample(u0,v1)]) {
                 positions.push(p[0],p[1],p[2]); colors.push(c.r,c.g,c.b);
