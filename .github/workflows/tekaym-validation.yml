@@ -183,7 +183,7 @@ jobs:
             [html.includes('class="touchDpad"')&&html.includes('id="touchCrouch"')&&html.includes('id="touchJump"')&&html.includes('.touchDpad #touchCrouch{grid-column:2;grid-row:2;'),'Bedrock-style d-pad, crouch, and jump layout missing'],
             [voxel.includes('Sixteen tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
             [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation'],
-            [main.includes('lastAutoSave>10000')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
+            [main.includes('now-lastAutoSave>(Math.max')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
           ];
           for(const [ok,message] of checks)if(!ok)throw new Error(message);
           console.log('Landscape mobile controls and pixel-art block checks passed');
