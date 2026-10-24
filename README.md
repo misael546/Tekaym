@@ -51,6 +51,16 @@ Juego de supervivencia 3D en primera persona con mundo cúbico procedural, const
 
 El modo P2P usa WebRTC DataChannel: el anfitrión mantiene el mundo y los cambios se transmiten directamente cuando la conexión logra establecerse. Para evitar un servicio de señalización central, la invitación (oferta) y la respuesta se copian y se comparten manualmente por un chat privado. Se necesita un navegador con HTTPS y redes que permitan establecer la conexión; algunas redes requieren TURN y pueden impedir la conexión directa. La conexión debe probarse con dos dispositivos reales. El antiguo sistema de salas con Worker permanece en el código como vía separada, pero no es necesario para el modo P2P.
 
+## Cómo conectar amigos por P2P
+
+1. El anfitrión abre su mundo guardado y pulsa **AMIGOS**.
+2. Pulsa **CREAR INVITACIÓN** y envía el texto completo a un amigo por un chat privado.
+3. El amigo abre **Configuraciones → Multijugador**, pega la invitación y pulsa **GENERAR RESPUESTA**.
+4. El amigo envía la respuesta completa al anfitrión; el anfitrión la pega y pulsa **CONECTAR AMIGO**.
+5. Para invitar a más personas, el anfitrión crea una invitación nueva para cada una. La conexión permanece activa solo mientras los participantes mantienen el juego abierto.
+
+**Privacidad y compatibilidad:** compartir una invitación puede exponer información de red, incluida la IP, al otro participante. Comparte códigos solo con personas de confianza. Algunas redes móviles, routers o firewalls bloquean WebRTC directo; sin TURN configurado, esas conexiones pueden fallar. No se ha validado todavía con dispositivos físicos.
+
 ## Arquitectura
 
 - Cliente Three.js.
