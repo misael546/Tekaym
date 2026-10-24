@@ -70,7 +70,7 @@ jobs:
             [main.includes('function craftIronSword')&&main.includes('function craftIronAxe')&&main.includes('function craftIronShovel'),'Iron tool recipes missing'],
             [main.includes('function updateDayCycle')&&main.includes('function makeAnimal')&&main.includes('function eatFood'),'Day cycle, animals, and food survival missing'],
             [main.includes('sunMesh')&&main.includes('moonMesh')&&main.includes('starField.visible=nowNight'),'Sun, moon, and night stars missing'],
-            [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchEat"'),'Day-night HUD and mobile eating missing'],
+            [main.includes('worldClockText.textContent=label')&&html.includes('id="worldClock"')&&html.includes('id="touchCrouch"')&&html.includes('id="dpadUp"'),'Day-night HUD and mobile eating missing'],
             [worker.includes('worldClock: this.worldClock')&&worker.includes("storage.put('worldClock', this.worldClock)"),'Shared persistent world clock missing'],
             [worker.includes('if (!(this.worldClock >= 650 && this.worldClock < 1150)) return;')&&worker.includes('this.zombieSpawnNear(target)'),'Hostile mobs must only move at night and spawn near players'],
             [main.includes("best.userData.type==='cow'")&&main.includes('inventory.rawBeef')&&main.includes('inventory.leather'),'Animal meat and drops missing'],
@@ -88,7 +88,7 @@ jobs:
             [worker.includes("weapon === 'ironSword'")&&worker.includes("weapon === 'stoneAxe'"),'Multiplayer weapon tiers missing'],
             [worker.includes("Keep AIR edits as tombstones"),'Broken-block persistence missing'],
             [html.includes('id="createWorldButton"')&&html.includes('id="joinWorldButton"'),'World create/join controls missing'],
-            [html.includes('id="touchMine"')&&html.includes('id="touchPlace"'),'Mobile block controls missing']
+            [html.includes('id="touchCrouch"')&&html.includes('id="dpadUp"')&&main.includes('mineTimer=setTimeout')&&main.includes('placeSelectedBlock()'),'Mobile hold-to-mine, place, and d-pad controls missing']
           ];
           for(const [ok,message] of checks)if(!ok)throw new Error(message);
           console.log('Voxel world and personal-room integration OK');
@@ -127,7 +127,7 @@ jobs:
           const html=fs.readFileSync('index.html','utf8');
           const cfg=fs.readFileSync('src/config.js','utf8');
           if(!html.includes('Tekaym Online'))throw new Error('Game title missing');
-          if(!html.includes('V1'))throw new Error('Client version marker missing');
+          if(/>\\s*V1\\s*</.test(html)||html.includes('Tekaym Online · V1'))throw new Error('Obsolete visible version marker found');
           if(!cfg.includes("GAME_VERSION='V1'"))throw new Error('Client config version missing');
           if(!r.clientPath.includes('/index.html'))throw new Error('Client path invalid');
           console.log('Version synchronization OK -> '+r.version);
@@ -179,8 +179,8 @@ jobs:
             [main.includes("screen.orientation.lock('landscape')"),'Browser landscape lock fallback missing'],
             [main.includes("navigator.maxTouchPoints>0")&&main.includes("const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y")&&!main.includes("controls.object.rotation.y+(isTouchDevice?camera.rotation.y:0)"),'Touch-device detection or camera-aligned movement missing'],
             [main.includes('function jumpPlayer()')&&main.includes('player.jumpVelocity-=18*dt')&&main.includes("e.code==='Space'")&&html.includes('id="touchJump"'),'Keyboard/mobile jump physics missing'],
-            [main.includes("lookYaw-=dx*.006")&&main.includes("move.addEventListener('pointercancel',resetMove)")&&main.includes("look.addEventListener('pointercancel',resetLook)"),'Touch camera delta or pointer cancellation recovery missing'],
-            [html.includes("@media(pointer:coarse){#touch{display:block!important}")&&html.includes('grid-template-columns:repeat(3,minmax(52px,1fr))')&&html.includes('top:142px;right:8px')&&html.includes('#touchInventory{top:96px!important;'),'Touch action buttons may cover the right camera joystick'],
+            [main.includes('lookYaw-=dx*.006')&&main.includes("renderer.domElement.addEventListener('pointercancel'")&&main.includes("renderer.domElement.addEventListener('pointermove'")&&main.includes("['dpadUp','w']"),'Touch drag camera or pointer cancellation recovery missing'],
+            [html.includes('class="touchDpad"')&&html.includes('id="touchCrouch"')&&html.includes('id="touchJump"')&&html.includes('.touchDpad #touchCrouch{grid-column:2;grid-row:2;'),'Bedrock-style d-pad, crouch, and jump layout missing'],
             [voxel.includes('Four tiny color tiles per face')&&voxel.includes('tileVariation='),'Pixel-art voxel face shading missing'],
             [apk.includes('android:screenOrientation="landscape"')&&apk.includes('Lock Android game orientation to landscape'),'APK build does not enforce landscape orientation'],
             [main.includes('lastAutoSave>10000')&&main.includes("addEventListener('pagehide'")&&main.includes("document.addEventListener('visibilitychange'"),'Periodic/background world save and stuck-input recovery missing']
