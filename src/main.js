@@ -43,7 +43,7 @@ let nightActive=false,lastAnimalSpawn=0,animalSequence=0;
 const worldClockText=$('worldClock');let lastClockSave=0;
 const keys={w:false,a:false,s:false,d:false};
 let streamedChunkX=Infinity,streamedChunkZ=Infinity;
-const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false,grounded:true,jumpVelocity:0};
+const player={id:null,name:'Jugador',hp:100,maxHp:100,stamina:100,hunger:100,thirst:100,cooldown:0,dead:false,grounded:true,jumpVelocity:0};let autoJump=null;
 let knife=null,handModel=null,heldVisual=null,heldSwing=0,blockParticles=[],socket=null,googleIdToken='',lookYaw=0,lookPitch=0,last=performance.now(),lastNet=0,lastSentX=Infinity,lastSentZ=Infinity,lastAutoSave=0,lastP2PHeartbeat=0,googleReady=false,connected=false;
 let p2pConnection=null,p2pRole=null,p2pRemoteId='p2p-guest',pendingP2PWorld=null;const p2pHostPeers=new Map();
 function disconnectMultiplayer(){
@@ -210,14 +210,14 @@ function moveLocal(dt){
  const v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
  if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y,dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw),pos=controls.object.position,next=pos.clone().addScaledVector(dir,speed*dt);
   if(Math.abs(next.x)<99900&&Math.abs(next.z)<99900){if(player.grounded){const current=voxelWorld.getHeightAt(pos.x,pos.z),target=voxelWorld.getHeightAt(next.x,next.z);next.y=current;
-   if(target>current+.08&&target-current<=1.05){const step=next.clone();step.y=target;if(canOccupy(step.x,step.z,step.y))controls.object.position.copy(step)}
+   if(target>current+.08&&target-current<=1.05){const step=next.clone();step.y=target;if(canOccupy(step.x,step.z,step.y)){controls.object.position.x=step.x;controls.object.position.z=step.z;autoJump={from:current,to:target,elapsed:0,duration:.18};player.grounded=false;player.jumpVelocity=0}}
    else if(target<current-.08){if(canOccupy(next.x,next.z,current)){controls.object.position.copy(next);player.grounded=false;player.jumpVelocity=0}}
    else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
   }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}
   player.stamina=Math.max(0,player.stamina-(sprinting?24:3)*dt)
  }else player.stamina=Math.min(100,player.stamina+22*dt);
  const pos=controls.object.position,ground=voxelWorld.getHeightAt(pos.x,pos.z);
- if(player.grounded){pos.y=ground;player.jumpVelocity=0}else{const old=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=ground){pos.y=ground;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=old;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
+ if(autoJump){autoJump.elapsed+=dt;const t=Math.min(1,autoJump.elapsed/autoJump.duration),ease=t*t*(3-2*t);pos.y=autoJump.from+(autoJump.to-autoJump.from)*ease;if(t>=1){pos.y=autoJump.to;autoJump=null;player.grounded=true;player.jumpVelocity=0}}else if(player.grounded){pos.y=ground;player.jumpVelocity=0}else{const old=pos.y;player.jumpVelocity-=18*dt;pos.y+=player.jumpVelocity*dt;if(pos.y<=ground){pos.y=ground;player.jumpVelocity=0;player.grounded=true}else if(!canOccupy(pos.x,pos.z,pos.y)){pos.y=old;player.jumpVelocity=Math.min(0,player.jumpVelocity)}}
  const cx=Math.floor(pos.x/16),cz=Math.floor(pos.z/16);if(cx!==streamedChunkX||cz!==streamedChunkZ){streamedChunkX=cx;streamedChunkZ=cz;voxelWorld.updateStreaming(pos)}
 }
 function updateNeeds(dt){
