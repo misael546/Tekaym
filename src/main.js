@@ -370,7 +370,7 @@ function buildDirectP2PModal(){
    if(p2pConnection){p2pConnection.close();p2pConnection=null}
    p2pRole='guest';p2pRemoteId='p2p-host';connected=false;player.id='p2p-guest';
    $('p2pStatus').textContent='Leyendo invitación y preparando respuesta…';
-   p2pConnection=await createDirectGuest($('p2pOfferIn').value,{onMessage:handleP2PMessage,onOpen:()=>{$('p2pStatus').textContent='Conectado al anfitrión. Recibiendo el mundo…';connected=true;sendP2P({type:'guest_ready'})},onClose:()=>{connected=false;$('p2pStatus').textContent='La conexión con el anfitrión se cerró.'}});
+   p2pConnection=await createDirectGuest($('p2pOfferIn').value,{onMessage:handleP2PMessage,onOpen:()=>{$('p2pStatus').textContent='Conectado al anfitrión. Recibiendo el mundo…';connected=true},onClose:()=>{connected=false;$('p2pStatus').textContent='La conexión con el anfitrión se cerró.'}});
    $('p2pAnswerOut').value=p2pConnection.answerText;
    $('p2pStatus').textContent='Respuesta lista. Envíala al anfitrión y mantén esta pantalla abierta.';
   }catch(e){$('p2pStatus').textContent=e.message||'No se pudo generar la respuesta.'}
