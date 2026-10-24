@@ -69,6 +69,7 @@ export async function createDirectGuest(offerText, { onMessage, onOpen, onClose 
     const timeout = setTimeout(() => reject(new Error('No se recibió el canal del anfitrión. Revisa la invitación e inténtalo otra vez.')), 20000);
     pc.addEventListener('datachannel', event => {
       clearTimeout(timeout);
+      pc._tekaymChannel = event.channel;
       wireChannel(event.channel, onMessage, onOpen, onClose);
       resolve(event.channel);
     }, { once: true });
