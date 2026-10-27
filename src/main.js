@@ -232,7 +232,7 @@ function moveLocal(dt){
  const v=new THREE.Vector3((keys.d?1:0)-(keys.a?1:0),0,(keys.s?1:0)-(keys.w?1:0));
  if(v.lengthSq()){v.normalize();const yaw=isTouchDevice?camera.rotation.y:controls.object.rotation.y,dir=v.applyAxisAngle(new THREE.Vector3(0,1,0),yaw),pos=controls.object.position,next=pos.clone().addScaledVector(dir,speed*dt);
   if(Math.abs(next.x)<99900&&Math.abs(next.z)<99900){if(player.grounded){const current=voxelWorld.getHeightAt(pos.x,pos.z),target=voxelWorld.getHeightAt(next.x,next.z);next.y=current;
-   if(target>current+.08&&target-current<=.55){const step=next.clone();step.y=target;if(canOccupy(step.x,step.z,step.y)){controls.object.position.x=step.x;controls.object.position.z=step.z;autoJump={from:current,to:target,elapsed:0,duration:.18};player.grounded=false;player.jumpVelocity=0}}
+   if(target>current+.08&&target-current<=1.05){const step=next.clone();step.y=target;if(canOccupy(step.x,step.z,step.y)){controls.object.position.x=step.x;controls.object.position.z=step.z;autoJump={from:current,to:target,elapsed:0,duration:.18};player.grounded=false;player.jumpVelocity=0}}
    else if(target<current-.08){if(canOccupy(next.x,next.z,current)){controls.object.position.copy(next);player.grounded=false;player.jumpVelocity=0;fallPeakY=current}}
    else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next);
   }else if(canOccupy(next.x,next.z,next.y))controls.object.position.copy(next)}
