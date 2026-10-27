@@ -27,6 +27,7 @@ jobs:
         run: npm run build:web
       - name: Generate Android project
         run: npx cap add android
+      # Lock Android game orientation to landscape
       - name: Set app label and landscape orientation
         run: |
           node - <<'NODE'
