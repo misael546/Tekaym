@@ -1,4 +1,4 @@
-# Tekaym Online
+# Tekaym
 
 Juego de supervivencia 3D en primera persona con mundo cúbico procedural, construcción por bloques, recolección, fabricación, criaturas y supervivencia. Esta es la base principal única de Tekaym Online; el antiguo mapa de prisión fue retirado. Proyecto independiente de NeonCore y DarkPixel Online.
 
