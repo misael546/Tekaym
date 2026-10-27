@@ -213,7 +213,38 @@ export function createVoxelWorld(scene, seedValue=7919) {
               else if(id===BLOCK.DIRT)tileVariation*=((px*7+py*3)%6===0)?0.74:1;
               else if(id===BLOCK.LEAVES)tileVariation*=((px+py)%3===0)?1.16:0.91;
               else if(id===BLOCK.SAND)tileVariation*=((px+py*2)%5===0)?0.9:1.03;
-              const c=base.clone().multiplyScalar(shade*tileVariation);
+              // Build a distinct pixel-art palette for each block instead of tinting every face uniformly.
+              let tileColor = base.clone();
+              const fleck = hash(x * 47 + px * 19 + face * 7 + id, y * 31 + py * 23, z * 53 + seed);
+              if (id === BLOCK.GRASS && face !== 2 && face !== 3) {
+                tileColor = px === 3 ? new THREE.Color(0x557c35) : new THREE.Color(0x76503a);
+                if (px === 3) tileVariation *= 0.9 + fleck * 0.18;
+              } else if (id === BLOCK.GRASS && face === 3) {
+                tileColor = new THREE.Color(0x5b4937);
+              } else if (id === BLOCK.WOOD && face === 2) {
+                tileColor = fleck > 0.55 ? new THREE.Color(0xb48a53) : new THREE.Color(0x8a633b);
+              } else if (id === BLOCK.WOOD && face === 3) {
+                tileColor = fleck > 0.55 ? new THREE.Color(0x78502e) : new THREE.Color(0x9b7447);
+              } else if ([BLOCK.COAL_ORE, BLOCK.IRON_ORE, BLOCK.GOLD_ORE, BLOCK.DIAMOND_ORE].includes(id)) {
+                tileColor = new THREE.Color(0x77766f);
+                const oreChance = id === BLOCK.COAL_ORE ? 0.32 : 0.25;
+                if (fleck > 1 - oreChance) tileColor = base.clone().multiplyScalar(0.78 + fleck * 0.28);
+                tileVariation = 0.88 + hash(x + px * 5, y + py * 7, z + face * 11 + seed) * 0.22;
+              } else if (id === BLOCK.STONE || id === BLOCK.FURNACE) {
+                if (fleck > 0.84) tileColor = new THREE.Color(0x96958d);
+                else if (fleck < 0.12) tileColor = new THREE.Color(0x62635f);
+              } else if (id === BLOCK.DIRT) {
+                if (fleck > 0.83) tileColor = new THREE.Color(0x896047);
+                else if (fleck < 0.14) tileColor = new THREE.Color(0x573c2d);
+              } else if (id === BLOCK.LEAVES && fleck > 0.62) {
+                tileColor = new THREE.Color(fleck > 0.82 ? 0x47783a : 0x2d4d2a);
+              } else if (id === BLOCK.SAND && fleck > 0.78) {
+                tileColor = new THREE.Color(0xd0bc88);
+              } else if (id === BLOCK.PLANKS || id === BLOCK.CRAFTING_TABLE) {
+                tileVariation *= (px === 0 || px === 3) ? 0.82 : 1.04;
+                if (fleck > 0.88) tileColor = new THREE.Color(0xb18a5b);
+              }
+              const c=tileColor.multiplyScalar(shade*tileVariation);
               for (const p of [sample(u0,v0),sample(u1,v0),sample(u1,v1),sample(u0,v1)]) {
                 positions.push(p[0],p[1],p[2]); colors.push(c.r,c.g,c.b);
               }
