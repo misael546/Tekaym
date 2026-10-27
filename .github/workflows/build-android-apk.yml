@@ -40,7 +40,7 @@ jobs:
           if 'SYSTEM_UI_FLAG_IMMERSIVE_STICKY' in source:
               print('Immersive fullscreen already configured')
               raise SystemExit(0)
-          source = source.replace('import com.getcapacitor.BridgeActivity;', 'import com.getcapacitor.BridgeActivity;\\nimport android.os.Bundle;\\nimport android.view.View;')
+          source = source.replace('import com.getcapacitor.BridgeActivity;', 'import com.getcapacitor.BridgeActivity;\nimport android.os.Bundle;\nimport android.view.View;')
           methods = '''
 
               private void hideSystemBars() {
