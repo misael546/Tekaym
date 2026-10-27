@@ -287,7 +287,7 @@ export function createVoxelWorld(scene, seedValue=7919) {
       // Never place a solid block inside or immediately against the player's collision capsule.
       // Use the block AABB on all three axes; this also prevents getting trapped by a block
       // placed at the feet, beside the body, or in the head/camera space on touch devices.
-      const playerRadius = 0.55;
+      const playerRadius = 0.42;
       const overlapsX = x < playerPosition.x + playerRadius && x + 1 > playerPosition.x - playerRadius;
       const overlapsZ = z < playerPosition.z + playerRadius && z + 1 > playerPosition.z - playerRadius;
       const feetY = playerPosition.y - 1.78;
