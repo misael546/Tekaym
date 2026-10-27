@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-android:
@@ -27,13 +27,13 @@ jobs:
         run: npm run build:web
       - name: Generate Android project
         run: npx cap add android
-      - name: Lock Android game orientation to landscape
+      - name: Set app label and landscape orientation
         run: |
           node - <<'NODE'
           const fs = require('fs');
           const path = 'android/app/src/main/AndroidManifest.xml';
           let xml = fs.readFileSync(path, 'utf8');
-          const activity = /<activity\b[^>]*android:name="\.MainActivity"[^>]*>/s;
+          const activity = /<activity\\b[^>]*android:name="\\.MainActivity"[^>]*>/s;
           const match = xml.match(activity);
           if (!match) throw new Error('Capacitor MainActivity not found in AndroidManifest.xml');
           let tag = match[0];
@@ -46,11 +46,35 @@ jobs:
           NODE
       - name: Sync Android assets
         run: npx cap sync android
-      - name: Build debug-signed APK
+      - name: Build APK
         run: cd android && ./gradlew --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+      - name: Sign APK with persistent release key
+        env:
+          TEKAYM_KEYSTORE_BASE64: ${{ secrets.TEKAYM_KEYSTORE_BASE64 }}
+          TEKAYM_KEYSTORE_PASSWORD: ${{ secrets.TEKAYM_KEYSTORE_PASSWORD }}
+          TEKAYM_KEY_ALIAS: ${{ secrets.TEKAYM_KEY_ALIAS }}
+          TEKAYM_KEY_PASSWORD: ${{ secrets.TEKAYM_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in TEKAYM_KEYSTORE_BASE64 TEKAYM_KEYSTORE_PASSWORD TEKAYM_KEY_ALIAS TEKAYM_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub Actions secret: $name"
+              exit 1
+            fi
+          done
+          printf '%s' "$TEKAYM_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/tekaym-release.jks"
+          APK_IN="android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_OUT="$RUNNER_TEMP/Tekaym.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/tekaym-release.jks" --ks-key-alias "$TEKAYM_KEY_ALIAS" --ks-pass env:TEKAYM_KEYSTORE_PASSWORD --key-pass env:TEKAYM_KEY_PASSWORD --out "$APK_OUT" "$APK_IN"
+          "$APKSIGNER" verify "$APK_OUT"
+          rm -f "$RUNNER_TEMP/tekaym-release.jks"
+      - name: Publish downloadable APK release
+        uses: softprops/action-gh-release@v2
         with:
-          name: tekaym-online-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+          tag_name: apk-build-${{ github.run_number }}
+          name: Tekaym APK build ${{ github.run_number }}
+          body: Automated Android APK build for Tekaym.
+          files: ${{ runner.temp }}/Tekaym.apk
+          make_latest: true
