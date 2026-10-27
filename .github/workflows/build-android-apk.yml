@@ -33,7 +33,7 @@ jobs:
           const fs = require('fs');
           const path = 'android/app/src/main/AndroidManifest.xml';
           let xml = fs.readFileSync(path, 'utf8');
-          const activity = /<activity\\b[^>]*android:name="\\.MainActivity"[^>]*>/s;
+          const activity = /<activity\b[^>]*android:name="\.MainActivity"[^>]*>/s;
           const match = xml.match(activity);
           if (!match) throw new Error('Capacitor MainActivity not found in AndroidManifest.xml');
           let tag = match[0];
